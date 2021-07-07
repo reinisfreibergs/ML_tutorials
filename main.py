@@ -8,7 +8,8 @@ def power(a, b):  # doesn't work for non-whole powers
                 result = result / a
         return result
     except:
-        return "Not a whole power"
+
+        return "Not a whole power!"
 
 
 def e_x(x):
