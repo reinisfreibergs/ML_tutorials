@@ -6,9 +6,9 @@ def power(a, b):  # doesn't work for non-whole powers
                 result = result * a
             else:
                 result = result / a
-        return result
     except:
-        return "Not a whole power"
+        result = -1
+    return result
 
 
 def e_x(x):
