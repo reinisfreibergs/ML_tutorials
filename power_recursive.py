@@ -1,8 +1,8 @@
 def pow_recursive(a, b):
     if b == 1:
-        return a
+        power = a
     else:
-        power = a * pow(a, b - 1)
+        power = a * pow_recursive(a, b - 1)
     return power
 
 
