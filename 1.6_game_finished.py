@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 import matplotlib
 
@@ -295,15 +296,20 @@ def press(event):
 fig, _ = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', press)
 
+
+dt = 0.1
 while is_running:
     plt.clf()
 
     plt.xlim(-10, 10)
     plt.ylim(-10, 10)
 
+    start = time.time()
     for character in characters:  # polymorphism
-        character.update_movement(dt = 0.3)
+        character.update_movement(dt)
         character.draw()
 
+    dt = 0.3 + time.time() - start
+    print(dt)
     plt.draw()
     plt.pause(1e-2)

@@ -1,0 +1,50 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+
+
+\title{Derivatives}
+\author{Reinis Freibergs}
+\date{July 2021}
+
+\begin{document}
+\maketitle
+
+
+\begin{equation*}
+\begin{aligned}
+    M(x) = Linear(W_2,b_2, ReLU( Linear(W_1,b_1,x)))=\\
+    W_2\cdot ReLU(Linear(W_1,b_1,x))+b_2 =\\
+    W_2\cdot (ReLU(W_1x + b_1))+b_2
+\end{aligned}
+\end{equation*}
+
+
+\bigskip
+
+\begin{equation*}
+\begin{aligned}
+    \frac{MAE(y, M(x))}{\partial b_1} = \\
+    \frac{\mid y - M(x) \mid}{\partial b_1} = \\
+    \frac{y - M(x)}{\mid y - M(x) \mid}\cdot \frac{-M(x)}{\partial b_1} = \\
+    -\frac{y - M(x)}{\mid y - M(x)\mid}\cdot W_2\cdot \frac{ ReLU(W_1x + b ) }{\partial (W_1x + b)} = \\
+    -\frac{y - M(x)}{\mid y - M(x)\mid}\cdot W_2\cdot\begin{cases}
+        1, & \text{if $W_1x + b_1\geq0$}\\
+        0, & \text{otherwise}
+        \end{cases}
+\end{aligned}
+\end{equation*}
+
+\bigskip
+
+\begin{equation*}
+\begin{aligned}
+    \frac{MAE(y, M(x))}{\partial b_2} =  \\
+    \frac{\mid y - M(x) \mid}{\partial b_2} = \\
+    \frac{y - M(x)}{\mid y - M(x) \mid}\cdot \frac{-M(x)}{\partial b_2} =  \\
+    -\frac{y - M(x)}{\mid y - M(x) \mid}
+\end{aligned}
+\end{equation*}
+
+
+\end{document}
