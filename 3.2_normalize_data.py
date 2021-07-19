@@ -19,7 +19,7 @@ def min_max_finder(data):
     column_data = []
     minmax = []
     if np.ndim(data) == 1:
-        data = np.transpose(np.atleast_2d(data))
+        data = np.transpose(np.expand_dims(data, axis = 0))
     # print(np.shape(data))
     for k in range(np.shape(data)[1]):
         for i in range(np.shape(data)[0]):
@@ -34,10 +34,10 @@ def min_max_finder(data):
 def normalize(data):
 
     if np.ndim(data) == 1:
-        data = np.transpose(np.atleast_2d(data))
+        data = np.transpose(np.expand_dims(data, axis = 0))
 
-    dataset = np.atleast_2d(np.zeros_like(data))
-    min_max = np.atleast_2d(min_max_finder(data))
+    dataset = np.zeros_like(data)
+    min_max = min_max_finder(data)
 
     for k in range(np.shape(data)[1]):
         for i in range(np.shape(data)[0]):
