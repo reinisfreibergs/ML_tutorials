@@ -6,8 +6,14 @@ X, Y = sklearn.datasets.fetch_california_housing(return_X_y = True)
 
 # print(X[:5])
 # print(Y[:5])
-dala = X[:5]
-daly = Y[:5]
+housing_parameters = X[:5]
+housing_price = Y[:5]
+
+def normalization(data):
+    minimum = np.min(data, axis = 0) # axis=0 iterates over columns, axis=1 over rows
+    maximum = np.max(data, axis = 0)
+
+    return 2*((data - minimum)/(maximum-minimum) - 0.5 )
 
 
 def normalize_value(value, minimum, maximum):
@@ -45,6 +51,8 @@ def normalize(data):
 
     return dataset
 
-print(normalize(dala))
-print(normalize(daly))
+
+
+print(normalize(housing_parameters))
+print(normalize(housing_price))
 
