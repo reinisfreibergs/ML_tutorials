@@ -1,3 +1,4 @@
+import time
 import sklearn.datasets
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,8 +15,9 @@ Y = np.expand_dims(Y, axis=1)
 # sample 3 => X[2, 0:8], Y[2, 0]
 
 # TODO implement min max normalization for each dimension in X and Y
-print(X[:5])
-print(Y[:5])
+# print(X[:5])
+# print(Y[:5])
+
 
 
 class Variable(object):
@@ -24,7 +26,7 @@ class Variable(object):
         self.grad: np.ndarray = np.zeros_like(value)
 
 
-class LinearLayer(object):
+class LayerLinear(object):
     def __init__(self, in_features: int, out_features: int):
         self.W = Variable(
             value=np.random.random((out_features, in_features))
@@ -60,16 +62,141 @@ class LinearLayer(object):
         ).transpose()
 
 
-linear_1 = LinearLayer(in_features=8, out_features=4)
-# relu
-linear_2 = LinearLayer(in_features=4, out_features=1)
-x = Variable(value=X[:10])
-out = linear_1.forward(x)
-# relu
-y_prim = linear_2.forward(out)
+# linear_1 = LinearLayer(in_features=8, out_features=4)
+# # relu
+# linear_2 = LinearLayer(in_features=4, out_features=1)
+# x = Variable(value=X[:10])
+# out = linear_1.forward(x)
+# # relu
+# y_prim = linear_2.forward(out)
+#
+# # loss func
+# # loss backward
+# linear_2.backward()
+# linear_1.backward()
 
-# loss func
-# loss backward
 
-linear_2.backward()
-linear_1.backward()
+class LayerReLU:
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        #[1, -2, ...] x.value(>=0) -> [True, False ...]
+        #[True, False] * 1 -> [1, 0]
+        self.output = Variable(
+            (x.value >= 0) * x.value
+        )
+        return self.output
+
+    def backward(self):
+        self.x.grad = (self.x.value >= 0) * self.output.grad
+
+class LossMAE():
+    def __init__(self):
+        self.y = None
+        self.y_prim = None
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        loss = np.mean(np.abs(y.value - y_prim.value))
+        return loss
+
+    def backward(self):
+        self.y_prim.grad = (self.y_prim.value - self.y.value) / np.abs(self.y.value - self.y_prim.value)
+
+class Model:
+    def __init__(self):
+        self.layers = [
+            LayerLinear(in_features=8, out_features=4),
+            LayerReLU(),
+            LayerLinear(in_features=4, out_features=4),
+            LayerReLU(),
+            LayerLinear(in_features=4, out_features=1)
+        ]
+
+    def forward(self, x: Variable):
+        out = x
+        for layer in self.layers:
+            out = layer.forward(out)
+        return out
+
+    def backward(self):
+        for layer in reversed(self.layers):
+            layer.backward()
+
+    def parameters(self):
+        variables = []
+        for layer in self.layers:
+            if isinstance(layer, LayerLinear):
+                variables.append(layer.W)
+                variables.append(layer.b)
+        return variables
+
+class OptimizerSGD:
+    def __init__(self, parameters, learning_rate):
+        self.parameters = parameters
+        self.learning_rate = learning_rate
+
+    def step(self):
+        for param in self.parameters:
+            param.value -= np.mean(param.grad, axis = 0) *self.learning_rate
+
+
+LEARNING_RATE = 1e-2
+BATCH_SIZE = 16
+
+model = Model()
+optimizer = OptimizerSGD(
+    model.parameters(),
+    LEARNING_RATE
+)
+loss_fn = LossMAE()
+
+np.random.seed(0)
+idxes_rand = np.random.permutation(len(X))
+X = X[idxes_rand]
+Y = Y[idxes_rand]
+
+idx_split = int(len(X) * 0.8)
+dataset_train = (X[:idx_split], Y[:idx_split])
+dataset_test = (X[idx_split:], Y[idx_split:])
+
+np.random.seed(int(time.time()))
+
+losses_train = [] #for plotting
+losses_test = []
+for epoch in range(1, 300):
+
+    for dataset in [dataset_train, dataset_test]:
+        X, Y = dataset
+        losses = []
+        for idx in range(0, len(X)- BATCH_SIZE, BATCH_SIZE):
+            x = X[idx:idx+BATCH_SIZE]
+            y = Y[idx:idx+BATCH_SIZE]
+
+            y_prim = model.forward(Variable(x))
+            loss = loss_fn.forward(Variable(y), y_prim)
+
+            losses.append(loss)
+
+            if dataset == dataset_train:
+                loss_fn.backward()
+                model.backward()
+                optimizer.step()
+
+        if dataset == dataset_train:
+            losses_train.append(np.mean(losses))
+        else:
+            losses_test.append(np.mean(losses))
+
+    print(f'epoch: {epoch} losses_train: {losses_train[-1]} losses_test: {losses_test[-1]}')
+    if epoch % 10 == 0:
+        plt.plot(losses_train)
+        plt.plot(losses_test)
+        plt.ion()
+        plt.show()
+        plt.pause(.001)
+
