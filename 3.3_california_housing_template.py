@@ -15,10 +15,14 @@ Y = np.expand_dims(Y, axis=1)
 # sample 3 => X[2, 0:8], Y[2, 0]
 
 # TODO implement min max normalization for each dimension in X and Y
-# print(X[:5])
-# print(Y[:5])
+def normalization(data):
+    minimum = np.min(data, axis = 0)
+    maximum = np.max(data, axis = 0)
 
+    return 2*((data - minimum)/(maximum-minimum) - 0.5 )
 
+# X = normalization(X)
+# Y = normalization(Y)
 
 class Variable(object):
     def __init__(self, value):
@@ -29,7 +33,8 @@ class Variable(object):
 class LayerLinear(object):
     def __init__(self, in_features: int, out_features: int):
         self.W = Variable(
-            value=np.random.random((out_features, in_features))
+            # value=np.random.random((out_features, in_features))
+            value=np.ones((out_features, in_features))
         )
         self.b = Variable(
             value=np.zeros((out_features,))
@@ -107,6 +112,35 @@ class LossMAE():
     def backward(self):
         self.y_prim.grad = (self.y_prim.value - self.y.value) / np.abs(self.y.value - self.y_prim.value)
 
+class LossMSE():
+    def __init__(self):
+        self.y = None
+        self.y_prim = None
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        loss = np.mean((y.value - y_prim.value)**2)
+        return loss
+
+    def backward(self):
+        self.y_prim.grad = 2 * (self.y_prim.value - self.y.value)
+
+class LossHuber():
+    def __init__(self):
+        self.y = None
+        self.y_prim = None
+        self.delta = 1
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        loss = self.delta**2 * np.sum(np.sqrt(1 + (((y.value - y_prim.value)/self.delta)**2)) -1)
+        return loss
+
+    def backward(self):
+        self.y_prim.grad = (self.y_prim.value - self.y.value)/ np.sqrt((self.y.value - self.y_prim.value)**2 + 1)
+
 class Model:
     def __init__(self):
         self.layers = [
@@ -153,7 +187,7 @@ optimizer = OptimizerSGD(
     model.parameters(),
     LEARNING_RATE
 )
-loss_fn = LossMAE()
+loss_fn = LossMSE()
 
 np.random.seed(0)
 idxes_rand = np.random.permutation(len(X))
