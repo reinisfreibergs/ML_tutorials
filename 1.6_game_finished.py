@@ -125,6 +125,10 @@ class Character(object):
         self.dir = np.array(self.dir_init)
         self.speed = 0.25
 
+        self.S = scale_mat(sx=0.2, sy=1.5)
+
+        self.margin_detect = False
+
 
         self.generate_geometry()
 
@@ -152,8 +156,9 @@ class Character(object):
         T_centered = translation_mat(dx= 0, dy= -0.75)
 
         self.C = T_centered
-        self.C = dot(self.R, self.C)
-        self.C = dot(self.T, self.C)
+        self.C = np.dot(self.S, self.C)
+        self.C = np.dot(self.R, self.C)
+        self.C = np.dot(self.T, self.C)
 
 
     def set_position(self, pos):
@@ -167,8 +172,9 @@ class Character(object):
         x_values = []
         y_values = []
 
-        ship_scaled = scale_mat(sx=0.2, sy=1.5)
-        self.C = dot(self.C, ship_scaled)
+        # ship_scaled = scale_mat(sx=0.2, sy=1.5)
+        # self.C = dot(self.C, ship_scaled)
+        margins = [10, -10]
 
         for vec2d in self.geometry:
 
@@ -176,12 +182,16 @@ class Character(object):
             vec3d = dot(self.C, vec3d)
             vec2d = vec3d_to_vec2d(vec3d)
 
+            if self.margin_detect:
+                if round(vec2d[0], 1) in margins:
+                    self.speed *= -1
+                elif round(vec2d[1], 1) in margins:
+                    self.speed *= -1
+
             x_values.append(vec2d[0])
-            # print(vec2d)
             y_values.append(vec2d[1])
 
         plt.plot(x_values, y_values, c=self.color)
-
 
 class Asteroid(Character):
     def __init__(self):
@@ -193,6 +203,10 @@ class Asteroid(Character):
         self.pos = -10 * np.random.random((2,)) +5
         self.speed = np.random.random() * 0.5 + 0.1
         self.set_angle(np.random.random() * 360)
+
+        self.S = scew_mat(x=0.1, y=0.5)
+
+        self.margin_detect = True
 
     def generate_geometry(self):
         self.geometry = []
@@ -211,37 +225,11 @@ class Asteroid(Character):
 
         self.geometry.append(np.array(self.geometry[0]))
 
-    def draw(self):
-
-        margins = [10, -10]
-        x_values = []
-        y_values = []
-
-        asteroid_scaled = scew_mat(x=0.1, y=0.5)
-        self.C = dot(self.C, asteroid_scaled)
-
-        for vec2d in self.geometry:
-
-            vec3d = vec2d_to_vec3d(vec2d)
-            vec3d = dot(self.C, vec3d)
-            vec2d = vec3d_to_vec2d(vec3d)
-
-            if round(vec2d[0],1) in margins:
-                # self.set_angle(self.get_angle() + 1)
-                self.speed *= -1
-            if round(vec2d[1], 1) in margins:
-                # self.set_angle(self.get_angle() - 1)
-                self.speed *= -1
-
-            x_values.append(vec2d[0])
-            y_values.append(vec2d[1])
-
-        plt.plot(x_values, y_values, c=self.color)
-
 
 class Player(Character):
     def __init__(self):
         super().__init__()
+        self.S = scale_mat(sx=0.2, sy=1.5)
 
     def generate_geometry(self):
         self.geometry = np.array([
@@ -256,7 +244,6 @@ class Bullet(Character):
         super().__init__()
 
         self.pos = np.array(player.get_position())
-        self.T = translation_mat(self.pos[0], self.pos[1])
         self.speed = 3
         self.set_angle(player.get_angle())
 
@@ -297,7 +284,7 @@ fig, _ = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', press)
 
 
-dt = 0.1
+dt = 0.3
 while is_running:
     plt.clf()
 
@@ -310,6 +297,5 @@ while is_running:
         character.draw()
 
     dt = 0.3 + time.time() - start
-    print(dt)
     plt.draw()
     plt.pause(1e-2)
