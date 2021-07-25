@@ -141,6 +141,31 @@ class LossHuber():
     def backward(self):
         self.y_prim.grad = (self.y_prim.value - self.y.value)/ np.sqrt((self.y.value - self.y_prim.value)**2 + 1)
 
+
+class Precision_std():
+    def __init__(self):
+        self.y = None
+        self.y_prim = None
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        # loss = np.mean((y.value - y_prim.value)**2)
+        loss = (1/np.std(y.value,axis = 0)) * np.sqrt(np.mean((y.value - y_prim.value)**2))
+        return loss
+
+class Precision_max_min():
+    def __init__(self):
+        self.y = None
+        self.y_prim = None
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        loss = (1 / (np.max(y.value,axis = 0) - np.min(y.value, axis=0))) * np.sqrt(np.mean((y.value - y_prim.value)**2))
+        return loss
+
+
 class Model:
     def __init__(self):
         self.layers = [
@@ -187,7 +212,12 @@ optimizer = OptimizerSGD(
     model.parameters(),
     LEARNING_RATE
 )
+# loss_fn = LossMAE()
 loss_fn = LossMSE()
+# loss_fn = LossHuber()
+
+precision_fn_1 = Precision_std()
+precision_fn_2 = Precision_max_min()
 
 np.random.seed(0)
 idxes_rand = np.random.permutation(len(X))
@@ -202,19 +232,27 @@ np.random.seed(int(time.time()))
 
 losses_train = [] #for plotting
 losses_test = []
+precision_std = []
+precision_max_min = []
 for epoch in range(1, 300):
 
     for dataset in [dataset_train, dataset_test]:
         X, Y = dataset
         losses = []
+        precision_std1 = []
+        precision_max_min1 = []
         for idx in range(0, len(X)- BATCH_SIZE, BATCH_SIZE):
             x = X[idx:idx+BATCH_SIZE]
             y = Y[idx:idx+BATCH_SIZE]
 
             y_prim = model.forward(Variable(x))
             loss = loss_fn.forward(Variable(y), y_prim)
+            precision1 = precision_fn_1.forward(Variable(y), y_prim)
+            precision2 = precision_fn_2.forward(Variable(y), y_prim)
 
             losses.append(loss)
+            precision_std1.append(precision1)
+            precision_max_min1.append(precision2)
 
             if dataset == dataset_train:
                 loss_fn.backward()
@@ -225,8 +263,10 @@ for epoch in range(1, 300):
             losses_train.append(np.mean(losses))
         else:
             losses_test.append(np.mean(losses))
+            precision_std.append(np.mean(precision_std1))
+            precision_max_min.append(np.mean(precision_max_min1))
 
-    print(f'epoch: {epoch} losses_train: {losses_train[-1]} losses_test: {losses_test[-1]}')
+    print(f'epoch: {epoch} losses_train: {losses_train[-1]} losses_test: {losses_test[-1]} precision_std_test: {precision_std[-1]} precision_max_min_test: {precision_max_min[-1]}')
     if epoch % 10 == 0:
         plt.plot(losses_train)
         plt.plot(losses_test)
