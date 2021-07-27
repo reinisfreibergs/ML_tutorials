@@ -151,7 +151,7 @@ class Precision_std():
         self.y = y
         self.y_prim = y_prim
         # loss = np.mean((y.value - y_prim.value)**2)
-        loss = (1/np.std(y.value,axis = 0)) * np.sqrt(np.mean((y.value - y_prim.value)**2))
+        loss = (1/np.std(y.value)) * np.sqrt(np.mean((y.value - y_prim.value)**2))
         return loss
 
 class Precision_max_min():
@@ -162,7 +162,18 @@ class Precision_max_min():
     def forward(self, y: Variable, y_prim: Variable):
         self.y = y
         self.y_prim = y_prim
-        loss = (1 / (np.max(y.value,axis = 0) - np.min(y.value, axis=0))) * np.sqrt(np.mean((y.value - y_prim.value)**2))
+        loss = (1 / (np.max(y.value) - np.min(y.value))) * np.sqrt(np.mean((y.value - y_prim.value)**2))
+        return loss
+
+class Precision_r_squared():
+    def __init__(self):
+        self.y = None
+        self.y_prim = None
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        loss = 1 - (np.sum(((y_prim.value - y.value)**2)) / np.sum(((np.mean(y_prim.value) - y.value)**2)))
         return loss
 
 
@@ -213,8 +224,8 @@ optimizer = OptimizerSGD(
     LEARNING_RATE
 )
 # loss_fn = LossMAE()
-loss_fn = LossMSE()
-# loss_fn = LossHuber()
+# loss_fn = LossMSE()
+loss_fn = LossHuber()
 
 precision_fn_1 = Precision_std()
 precision_fn_2 = Precision_max_min()
@@ -267,10 +278,13 @@ for epoch in range(1, 300):
             precision_max_min.append(np.mean(precision_max_min1))
 
     print(f'epoch: {epoch} losses_train: {losses_train[-1]} losses_test: {losses_test[-1]} precision_std_test: {precision_std[-1]} precision_max_min_test: {precision_max_min[-1]}')
-    if epoch % 10 == 0:
+    # if epoch % 1 == 0:
+    #     plt.plot(losses_train)
+    #     plt.plot(losses_test)
+    #     plt.ion()
+    #     plt.show()
+    #     plt.pause(.001)
+    if epoch % 299 == 0:
         plt.plot(losses_train)
         plt.plot(losses_test)
-        plt.ion()
         plt.show()
-        plt.pause(.001)
-
