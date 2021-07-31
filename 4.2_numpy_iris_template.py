@@ -89,12 +89,25 @@ class LayerSoftmax():
 
     def forward(self, x):
         self.x = x
-        #TODO
+        self.x = x
+        np_x = np.copy(x.value)
+        np_x -= np.max(np_x, axis=1, keepdims=True)
+        self.output = Variable(
+            (np.exp(np_x + 1e-8)) / np.sum(np.exp(np_x), axis=1, keepdims=True)
+        )
         return self.output
 
     def backward(self):
-        #TODO
-        self.x.grad = 0
+        for l in range(BATCH_SIZE):
+            a = self.output.value[l]
+            J = np.zeros((3,3))
+            for i in range(3):
+                for j in range(3):
+                    if i==j:
+                        J[i,j] = a[i] * (1 - a[i])
+                    else:
+                        J[i,j] = -a[i] * a[j]
+            self.x.grad[l] = np.dot(J, self.output.grad[l])
 
 
 
@@ -103,22 +116,23 @@ class LossCrossEntropy():
         self.y_prim = None
 
     def forward(self, y, y_prim):
-        #TODO
-        return 0
+        self.y_prim = y_prim
+        self.y = y
+        return np.mean(-y.value * np.log(y_prim.value ))
 
     def backward(self):
-         #TODO
-        pass
+         self.y_prim.grad = -self.y.value / self.y_prim.value
 
 class Model:
     def __init__(self):
          #TODO
         self.layers = [
-            LayerLinear(in_features=8, out_features=16), # W_1*x + b < dW , db
+            LayerLinear(in_features=4, out_features=4), # W_1*x + b < dW , db
             LayerReLU(),
-            LayerLinear(in_features=16, out_features=16), # W_2*x + b
+            LayerLinear(in_features=4, out_features=4), # W_2*x + b
             LayerReLU(),
-            LayerLinear(in_features=16, out_features=1), # W_3*x + b
+            LayerLinear(in_features=4, out_features=3), # W_3*x + b
+            LayerSoftmax()
         ]
 
     def forward(self, x):
@@ -162,7 +176,7 @@ loss_test = []
 acc_train = []
 acc_test = []
 
-for epoch in range(1, 100):
+for epoch in range(1, 300):
 
     for dataset in [dataset_train, dataset_test]:
         X, Y = dataset
@@ -175,7 +189,7 @@ for epoch in range(1, 100):
             y_prim = model.forward(Variable(value=x))
             loss = loss_fn.forward(Variable(value=y), y_prim)
 
-            accuracy = 0  #TODO
+            accuracy = np.max(y_prim.value * y, axis=1)
             losses.append(loss)
             accuracies.append(accuracy)
 
@@ -199,7 +213,7 @@ for epoch in range(1, 100):
         f'acc_test: {acc_test[-1]} '
     )
 
-    if epoch % 10 == 0:
+    if epoch % 100 == 0:
         plt.subplot(2, 1, 1)
         plt.title('loss')
         plt.plot(loss_train)
