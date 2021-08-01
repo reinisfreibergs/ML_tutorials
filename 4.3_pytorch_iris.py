@@ -42,7 +42,7 @@ class Model(torch.nn.Module):
         return y_prim
 
 model = Model()
-optimizer = torch.optim.SGD(
+optimizer = torch.optim.Adam(
     params=model.parameters(),
     lr = LEARNING_RATE
 )
@@ -53,7 +53,7 @@ loss_plot_test = []
 accuracy_plot_train = []
 accuracy_plot_test = []
 
-for epoch in range(1, 2000):
+for epoch in range(1, 20000):
 
     for dataset in [dataset_train, dataset_test]:
         X, Y = dataset
@@ -65,7 +65,8 @@ for epoch in range(1, 2000):
 
             y_prim = model.forward(torch.FloatTensor(x))
             y = torch.FloatTensor(y)
-            loss = torch.mean(-y * torch.log(y_prim + 1e-18)) #LossCrossEntropy loss function
+            # loss = torch.mean(-y * torch.log(y_prim + 1e-18)) #LossCrossEntropy loss function
+            loss = torch.mean(y_prim * torch.log(y_prim / (y + 1e-8))) - torch.sum(y_prim) + torch.sum(y)
 
             losses.append(loss.item())
             # y = y.detach() #y.fn_grad
@@ -87,7 +88,7 @@ for epoch in range(1, 2000):
 
     print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]} accuracy_train: {accuracy_plot_train[-1]} accuracy_test: {accuracy_plot_test[-1]}')
 
-    if epoch % 250 == 0:
+    if epoch % 500 == 0:
         plt.subplot(2,1,1)
         plt.plot(loss_plot_train)
         plt.plot(loss_plot_test)
