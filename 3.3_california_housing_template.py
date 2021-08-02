@@ -2,10 +2,12 @@ import time
 import sklearn.datasets
 import numpy as np
 import matplotlib.pyplot as plt
+import csv
 
-X, Y = sklearn.datasets.fetch_california_housing(return_X_y=True)
+
+# X, Y = sklearn.datasets.fetch_california_housing(return_X_y=True)
 # Y.shape (N, )
-Y = np.expand_dims(Y, axis=1)
+# Y = np.expand_dims(Y, axis=1)
 
 # X.shape (N, 8)
 # Y.shape (N, 1)
@@ -15,14 +17,15 @@ Y = np.expand_dims(Y, axis=1)
 # sample 3 => X[2, 0:8], Y[2, 0]
 
 # TODO implement min max normalization for each dimension in X and Y
-def normalization(data):
+def normalization(data ,a , b):
     minimum = np.min(data, axis = 0)
     maximum = np.max(data, axis = 0)
 
-    return 2*((data - minimum)/(maximum-minimum) - 0.5 )
+    # return 2*((data - minimum)/(maximum-minimum) - 0.5 )
+    return a*((data - minimum)/(maximum-minimum) - b )
 
-# X = normalization(X)
-# Y = normalization(Y)
+# X = normalization(X, 2, 0.5)
+# Y = normalization(Y, 2, 0.5)
 
 class Variable(object):
     def __init__(self, value):
@@ -215,7 +218,7 @@ class OptimizerSGD:
             param.value -= np.mean(param.grad, axis = 0) *self.learning_rate
 
 
-LEARNING_RATE = 1e-2
+LEARNING_RATE = 1e-4
 BATCH_SIZE = 16
 
 model = Model()
@@ -223,68 +226,96 @@ optimizer = OptimizerSGD(
     model.parameters(),
     LEARNING_RATE
 )
-# loss_fn = LossMAE()
+loss_fn = LossMAE()
 # loss_fn = LossMSE()
-loss_fn = LossHuber()
+# loss_fn = LossHuber()
 
 precision_fn_1 = Precision_std()
 precision_fn_2 = Precision_max_min()
 
 np.random.seed(0)
-idxes_rand = np.random.permutation(len(X))
-X = X[idxes_rand]
-Y = Y[idxes_rand]
+converged_epoch = []
+multipliers = [0.01, 0.05, 0.1, 0.5, 1, 2, 10]
+multipliers = [10, 50]
+for a in multipliers:
+    X, Y = sklearn.datasets.fetch_california_housing(return_X_y=True)
+    Y = np.expand_dims(Y, axis=1)
+    X = normalization(X, a, a/2)
+    Y = normalization(Y, a, a/2)
 
-idx_split = int(len(X) * 0.8)
-dataset_train = (X[:idx_split], Y[:idx_split])
-dataset_test = (X[idx_split:], Y[idx_split:])
+    idxes_rand = np.random.permutation(len(X))
+    X = X[idxes_rand]
+    Y = Y[idxes_rand]
 
-np.random.seed(int(time.time()))
+    idx_split = int(len(X) * 0.8)
+    dataset_train = (X[:idx_split], Y[:idx_split])
+    dataset_test = (X[idx_split:], Y[idx_split:])
 
-losses_train = [] #for plotting
-losses_test = []
-precision_std = []
-precision_max_min = []
-for epoch in range(1, 300):
+    np.random.seed(int(time.time()))
 
-    for dataset in [dataset_train, dataset_test]:
-        X, Y = dataset
-        losses = []
-        precision_std1 = []
-        precision_max_min1 = []
-        for idx in range(0, len(X)- BATCH_SIZE, BATCH_SIZE):
-            x = X[idx:idx+BATCH_SIZE]
-            y = Y[idx:idx+BATCH_SIZE]
+    losses_train = [] #for plotting
+    losses_test = []
+    precision_std = []
+    precision_max_min = []
+    for epoch in range(1, 1000000):
 
-            y_prim = model.forward(Variable(x))
-            loss = loss_fn.forward(Variable(y), y_prim)
-            precision1 = precision_fn_1.forward(Variable(y), y_prim)
-            precision2 = precision_fn_2.forward(Variable(y), y_prim)
+        for dataset in [dataset_train, dataset_test]:
+            X, Y = dataset
+            losses = []
+            precision_std1 = []
+            precision_max_min1 = []
+            for idx in range(0, len(X)- BATCH_SIZE, BATCH_SIZE):
+                x = X[idx:idx+BATCH_SIZE]
+                y = Y[idx:idx+BATCH_SIZE]
 
-            losses.append(loss)
-            precision_std1.append(precision1)
-            precision_max_min1.append(precision2)
+                y_prim = model.forward(Variable(x))
+                loss = loss_fn.forward(Variable(y), y_prim)
+                precision1 = precision_fn_1.forward(Variable(y), y_prim)
+                precision2 = precision_fn_2.forward(Variable(y), y_prim)
+
+                losses.append(loss)
+                precision_std1.append(precision1)
+                precision_max_min1.append(precision2)
+
+                if dataset == dataset_train:
+                    loss_fn.backward()
+                    model.backward()
+                    optimizer.step()
 
             if dataset == dataset_train:
-                loss_fn.backward()
-                model.backward()
-                optimizer.step()
+                losses_train.append(np.mean(losses))
+            else:
+                losses_test.append(np.mean(losses))
+                precision_std.append(np.mean(precision_std1))
+                precision_max_min.append(np.mean(precision_max_min1))
 
-        if dataset == dataset_train:
-            losses_train.append(np.mean(losses))
-        else:
-            losses_test.append(np.mean(losses))
-            precision_std.append(np.mean(precision_std1))
-            precision_max_min.append(np.mean(precision_max_min1))
+        # print(f'epoch: {epoch} losses_train: {losses_train[-1]} losses_test: {losses_test[-1]} precision_std_test: {precision_std[-1]} precision_max_min_test: {precision_max_min[-1]}')
+        print(f'epoch: {epoch} losses_train: {losses_train[-1]} precision_std_test: {precision_std[-1]}')
+        # if epoch % 1 == 0:
+        #     plt.plot(losses_train)
+        #     plt.plot(losses_test)
+        #     plt.ion()
+        #     plt.show()
+        #     plt.pause(.001)
+        # if epoch % 299 == 0:
+        #     plt.plot(losses_train)
+        #     plt.plot(losses_test)
+        #     plt.show()
 
-    print(f'epoch: {epoch} losses_train: {losses_train[-1]} losses_test: {losses_test[-1]} precision_std_test: {precision_std[-1]} precision_max_min_test: {precision_max_min[-1]}')
-    # if epoch % 1 == 0:
-    #     plt.plot(losses_train)
-    #     plt.plot(losses_test)
-    #     plt.ion()
-    #     plt.show()
-    #     plt.pause(.001)
-    if epoch % 299 == 0:
-        plt.plot(losses_train)
-        plt.plot(losses_test)
-        plt.show()
+        if len(losses_train) > 1:
+            if round(losses_train[-1], 6) == round(losses_train[-2], 6):
+                converged_epoch.append([a, epoch, losses_train[-1], precision_std[-1]])
+                break
+        print(converged_epoch)
+
+print(converged_epoch)
+csv_file = open("4.4_convergence_test.csv", 'w')
+csv_writer = csv.writer(csv_file, delimiter=",")
+csv_writer.writerow(converged_epoch)
+
+coefficient = [item[0] for item in converged_epoch]
+epoch = [item[1] for item in converged_epoch]
+plt.plot(coefficient, epoch)
+plt.xlabel("coefficient a")
+plt.ylabel("epochs till converges")
+plt.show()
