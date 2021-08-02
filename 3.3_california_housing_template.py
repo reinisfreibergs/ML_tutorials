@@ -221,11 +221,11 @@ class OptimizerSGD:
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 16
 
-model = Model()
-optimizer = OptimizerSGD(
-    model.parameters(),
-    LEARNING_RATE
-)
+# model = Model()
+# optimizer = OptimizerSGD(
+#     model.parameters(),
+#     LEARNING_RATE
+# )
 loss_fn = LossMAE()
 # loss_fn = LossMSE()
 # loss_fn = LossHuber()
@@ -235,9 +235,14 @@ precision_fn_2 = Precision_max_min()
 
 np.random.seed(0)
 converged_epoch = []
-multipliers = [0.01, 0.05, 0.1, 0.5, 1, 2, 10]
-multipliers = [10, 50]
+multipliers = [0.0001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 10]
+# multipliers = [0.65, 0.7,0.8, 1, 1.2, 1.4, 10]
 for a in multipliers:
+    model = Model()
+    optimizer = OptimizerSGD(
+        model.parameters(),
+        LEARNING_RATE
+    )
     X, Y = sklearn.datasets.fetch_california_housing(return_X_y=True)
     Y = np.expand_dims(Y, axis=1)
     X = normalization(X, a, a/2)
