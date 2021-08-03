@@ -211,15 +211,15 @@ class Asteroid(Character):
     def generate_geometry(self):
         self.geometry = []
         step = 2 * np.pi/20
-        radius = 0.8 * np.random.random() + 0.5
+        self.radius = 0.8 * np.random.random() + 0.5
         theta = 0.0
 
         while theta < 2 * np.pi:
             a = 0.3 * np.random.random(2) + 0.5
 
             self.geometry.append(np.array([
-                a[0] * np.cos(theta) * radius,
-                a[1] * np.sin(theta) * radius
+                a[0] * np.cos(theta) * self.radius,
+                a[1] * np.sin(theta) * self.radius
             ]))
             theta += step
 
@@ -305,7 +305,9 @@ while is_running:
         b_y = round(b.get_position()[1], 2)
         delta_x = abs(a_x - b_x)
         delta_y = abs(a_y - b_y)
-        if delta_y < 0.5 and delta_x < 0.5:
+        distance = np.sqrt(delta_y**2 + delta_x**2)
+        # if delta_y < 0.5 and delta_x < 0.5:
+        if distance < ( a.radius + b.radius )/2 :
             a.speed *= -1 #virziena koeficients k = dy/dx, taisne -1/k ?
             b.speed *= -1
 
