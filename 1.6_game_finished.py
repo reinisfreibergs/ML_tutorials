@@ -1,6 +1,6 @@
 import numpy as np
 import time
-
+from itertools import combinations
 import matplotlib
 
 matplotlib.use("TkAgg")
@@ -285,6 +285,7 @@ fig.canvas.mpl_connect('key_press_event', press)
 
 
 dt = 0.3
+number_pairs = list(combinations(range(10), 2))
 while is_running:
     plt.clf()
 
@@ -295,6 +296,18 @@ while is_running:
     for character in characters:  # polymorphism
         character.update_movement(dt)
         character.draw()
+    for k in number_pairs:
+        a = characters[k[0]]
+        b = characters[k[1]]
+        a_x = round(a.get_position()[0], 2)
+        a_y = round(a.get_position()[1], 2)
+        b_x = round(b.get_position()[0], 2)
+        b_y = round(b.get_position()[1], 2)
+        delta_x = abs(a_x - b_x)
+        delta_y = abs(a_y - b_y)
+        if delta_y < 0.5 and delta_x < 0.5:
+            a.speed *= -1 #virziena koeficients k = dy/dx, taisne -1/k ?
+            b.speed *= -1
 
     dt = 0.3 + time.time() - start
     plt.draw()

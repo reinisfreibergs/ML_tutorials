@@ -1,0 +1,48 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+
+
+\title{SoftMax derivatives}
+\author{Reinis Freibergs}
+\date{August 2021}
+
+\begin{document}
+\maketitle
+
+\begin{equation*}
+\begin{aligned}
+    S_{i} = \frac{e^{a_{i}}}{\sum_{k=1}^{n}e^{a_{k}}}  =  \frac{e^{a_{i}}}{(e^{a_{1}} + e^{a_{2}} + e^{a_{3}})} \\
+    \frac{\partial S_{i}}{\partial a_{j}} = \frac{\partial\frac{e^{a_{i}}}{\sum_{k=1}^{n}e^{a_{k}}}}{\partial a_{j}} = \frac{(e^{a_{i}})' \sum_{k=1}^{n}e^{a_{k}}  -  e^{a_{i}}  (\sum_{k=1}^{n}e^{a_{k}})' 
+    }
+    {   (\sum_{k=1}^{n}e^{a_{k}})^{2}    }\\
+    \\
+    \frac {\partial e^{a_{i}} } {\partial a_{j} } = 
+    \begin{cases}
+        e^{a_{i}}, & \text{if i = j}\\
+        0, & \text{otherwise}
+    \end{cases}\\
+    \\
+    \frac{ \partial \sum_{k=1}^{n}e^{a_{k}} }{ \partial a_{j} } = e^{a_j}\\
+    \\
+    \text{ if i = j:}\\
+    \frac{\partial S_{i}}{\partial a_{j}} = \frac { e^{a_i} \sum_{k=1}^{n}e^{a_{k}} - e^{a_i} e^{a_j} } { (\sum_{k=1}^{n}e^{a_{k}})^{2}  } = \frac{e^{a_i}  }  {\sum_{k=1}^{n}e^{a_{k}}} \cdot
+    \frac{ (\sum_{k=1}^{n}e^{a_{k}} - e^{a_i} e^{a_{j}} ) } { \sum_{k=1}^{n}e^{a_{k}} } = S_i(1 - S_j)\\
+    \\
+    \text otherwise:\\
+    \frac{\partial S_{i}}{\partial a_{j}} = \frac { e^{a_i} \sum_{k=1}^{n}e^{a_{k}} - e^{a_i} e^{a_j} } { (\sum_{k=1}^{n}e^{a_{k}})^{2}  } = \frac{ - e^{a_i} e^{a_j} } { \sum_{k=1}^{n}e^{a_{k}} } = -S_i S_j\\
+    \\
+    \frac{\partial S_{i}}{\partial a_{j}} = \begin{pmatrix}
+    S_1(1-S_1) & -S_1S_2 & -S_1S_3\\
+    -S_2S_1 & S_2(1-S_2) & -S_2S_3\\
+    -S_3S_1 & -S_3S_2 & S_3(1-S_3)
+    \end{pmatrix}
+\end{aligned}
+\end{equation*}
+
+
+
+
+
+
+\end{document}
