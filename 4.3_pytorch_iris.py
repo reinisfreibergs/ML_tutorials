@@ -4,15 +4,25 @@ import sklearn.datasets
 import numpy as np
 import matplotlib.pyplot as plt
 
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 1e-4
 BATCH_SIZE = 5
+
+def normalization(data):
+    minimum = np.min(data, axis = 0)
+    maximum = np.max(data, axis = 0)
+
+    return 2*((data - minimum)/(maximum-minimum) - 0.5 )
 
 X, Y = sklearn.datasets.load_iris(return_X_y=True)
 
 np.random.seed(0)
 idxes_rand = np.random.permutation(len(X))
+
+X = normalization(X)
+
 X = X[idxes_rand]
 Y = Y[idxes_rand]
+
 
 Y_idxes = Y
 Y = np.zeros((len(Y), 3))
@@ -29,11 +39,11 @@ class Model(torch.nn.Module):
         super().__init__()
 
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(in_features=4, out_features=4),
+            torch.nn.Linear(in_features=4, out_features=16),
             torch.nn.ReLU(),
-            torch.nn.Linear(in_features=4, out_features=4),
+            torch.nn.Linear(in_features=16, out_features=16),
             torch.nn.ReLU(),
-            torch.nn.Linear(in_features=4, out_features=3),
+            torch.nn.Linear(in_features=16, out_features=3),
             torch.nn.Softmax()
         )
 
@@ -78,8 +88,6 @@ for epoch in range(1, 20000):
             # y_prim = y_prim.detach()
             # accuracy = torch.max(y_prim * y, dim=1)
             accuracy = torch.mean((y_idx == idx_y_prim) * 1.0)
-            print((y_idx == idx_y_prim) * 1.0)
-            print(accuracy)
             # accuracys.append(accuracy[0].tolist())
             accuracys.append(accuracy)
 
