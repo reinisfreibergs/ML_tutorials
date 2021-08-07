@@ -65,14 +65,23 @@ for epoch in range(1, 20000):
 
             y_prim = model.forward(torch.FloatTensor(x))
             y = torch.FloatTensor(y)
-            # loss = torch.mean(-y * torch.log(y_prim + 1e-18)) #LossCrossEntropy loss function
-            loss = torch.mean(y_prim * torch.log(y_prim / (y + 1e-8))) - torch.sum(y_prim) + torch.sum(y)
+
+            y_idx = torch.argmax(y, dim = 1, keepdim = True)
+            y_prim_out = torch.gather(y_prim, 1, y_idx)
+            idx_y_prim = torch.argmax(y_prim, dim=1)
+
+            loss = torch.mean(y_prim * torch.log((y_prim + 1e-8) / (y + 1e-8))) - torch.sum(y_prim) + torch.sum(y)
+            # loss = torch.mean(-torch.log(y_prim_out + 1e-8)) #LossCrossEntropy loss function
 
             losses.append(loss.item())
             # y = y.detach() #y.fn_grad
             # y_prim = y_prim.detach()
-            accuracy = torch.max(y_prim * y, dim=1)
-            accuracys.append(accuracy[0].tolist())
+            # accuracy = torch.max(y_prim * y, dim=1)
+            accuracy = torch.mean((y_idx == idx_y_prim) * 1.0)
+            print((y_idx == idx_y_prim) * 1.0)
+            print(accuracy)
+            # accuracys.append(accuracy[0].tolist())
+            accuracys.append(accuracy)
 
             if dataset == dataset_train:
                 loss.backward()
