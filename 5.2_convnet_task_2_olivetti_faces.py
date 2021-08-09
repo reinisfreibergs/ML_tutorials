@@ -4,6 +4,7 @@ import torchvision
 import matplotlib.pyplot as plt
 import torch.utils.data
 import torch.nn.functional
+import sklearn.datasets
 
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -11,21 +12,21 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 16
 MAX_LEN = 200
-INPUT_SIZE = 28
+INPUT_SIZE = 64
 DEVICE = 'cpu'
 
 if torch.cuda.is_available():
     DEVICE = 'cuda'
     MAX_LEN = 0
 
-class DatasetFassionMNIST(torch.utils.data.Dataset):
-    def __init__(self, is_train):
+class DatasetOlivetti(torch.utils.data.Dataset):
+    def __init__(self):
         super().__init__()
-        self.data = torchvision.datasets.FashionMNIST(
-            root='../data',
-            train=is_train,
-            download=True
+        self.X, self.Y = sklearn.datasets.fetch_olivetti_faces(
+            return_X_y=True,
+            download_if_missing=True
         )
+        self.data = list(zip(self.X, self.Y))
 
     def __len__(self):
         if MAX_LEN:
@@ -33,29 +34,30 @@ class DatasetFassionMNIST(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # list tuple np.array torch.FloatTensor
-        pil_x, y_idx = self.data[idx]
-        np_x = np.array(pil_x)
+        x_idx, y_idx = self.data[idx]
 
-        np_x = np.expand_dims(np_x, axis=0)
+        np_x = np.array(x_idx)
+        np_x_reshaped = np.reshape(np_x, (1,64,64))
+        x = torch.FloatTensor(np_x_reshaped)
 
-        x = torch.FloatTensor(np_x)
+        y = np.zeros((40,))
+        y[y_idx] = 1.0
+        y = torch.FloatTensor(y)
 
-        np_y = np.zeros((10,))
-        np_y[y_idx] = 1.0
-
-        y = torch.FloatTensor(np_y)
         return x, y
 
+init_dataset = DatasetOlivetti()
+lengths = [int(len(init_dataset)*0.8), int(len(init_dataset)*0.2)]
+subsetA, subsetB = torch.utils.data.random_split(init_dataset, lengths, generator=torch.Generator().manual_seed(0))
 
 data_loader_train = torch.utils.data.DataLoader(
-    dataset=DatasetFassionMNIST(is_train=True),
+    dataset=subsetA,
     batch_size=BATCH_SIZE,
     shuffle=True
 )
 
 data_loader_test = torch.utils.data.DataLoader(
-    dataset=DatasetFassionMNIST(is_train=False),
+    dataset=subsetB,
     batch_size=BATCH_SIZE,
     shuffle=False
 )
@@ -133,7 +135,7 @@ class Model(torch.nn.Module):
 
         self.fc = torch.nn.Linear(
             in_features=out_channels * o_3 * o_3,
-            out_features=10
+            out_features=40
         )
 
     def forward(self, x):
@@ -157,7 +159,7 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
-for epoch in range(1, 100):
+for epoch in range(1, 150):
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
