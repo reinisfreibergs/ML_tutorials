@@ -15,24 +15,64 @@ def normalization(data):
 
 X, Y = sklearn.datasets.load_iris(return_X_y=True)
 
-np.random.seed(0)
-idxes_rand = np.random.permutation(len(X))
+# np.random.seed(0)
+# idxes_rand = np.random.permutation(len(X))
 
 X = normalization(X)
 
-X = X[idxes_rand]
-Y = Y[idxes_rand]
+# X = X[idxes_rand]
+# Y = Y[idxes_rand]
+#
+#
+# Y_idxes = Y
+# Y = np.zeros((len(Y), 3))
+# Y[np.arange(len(Y)), Y_idxes] = 1.0
+#
+# idx_split = int(len(X) * 0.9)
+# dataset_train = (X[:idx_split], Y[:idx_split])
+# dataset_test = (X[idx_split:], Y[idx_split:])
+#
+# np.random.seed(int(time.time()))
 
 
-Y_idxes = Y
-Y = np.zeros((len(Y), 3))
-Y[np.arange(len(Y)), Y_idxes] = 1.0
+class DatasetIris(torch.utils.data.Dataset):
+    def __init__(self, X, Y):
+        super().__init__()
 
-idx_split = int(len(X) * 0.9)
-dataset_train = (X[:idx_split], Y[:idx_split])
-dataset_test = (X[idx_split:], Y[idx_split:])
+        self.data = list(zip(X,Y))
 
-np.random.seed(int(time.time()))
+    def __len__(self):
+        # if MAX_LEN:
+        #     return MAX_LEN
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        x_idx, y_idx = self.data[idx]
+
+        x = torch.FloatTensor(x_idx)
+
+        y = np.zeros((3,))
+        y[y_idx] = 1.0
+        y = torch.FloatTensor(y)
+        return x, y
+
+init_dataset = DatasetIris(X,Y)
+lengths = [int(len(init_dataset)*0.8), int(len(init_dataset)*0.2)]
+subsetA, subsetB = torch.utils.data.random_split(init_dataset, lengths, generator=torch.Generator().manual_seed(0))
+
+dataset_train = torch.utils.data.DataLoader(
+    dataset = subsetA,
+    # dataset=DatasetIris(X[:idx_split], Y[:idx_split]),
+    batch_size=BATCH_SIZE,
+    shuffle=True
+)
+
+dataset_test = torch.utils.data.DataLoader(
+    dataset = subsetB,
+    # dataset=DatasetIris(X[idx_split:], Y[idx_split:]),
+    batch_size=BATCH_SIZE,
+    shuffle=False
+)
 
 class Model(torch.nn.Module):
     def __init__(self):
@@ -66,13 +106,13 @@ accuracy_plot_test = []
 for epoch in range(1, 20000):
 
     for dataset in [dataset_train, dataset_test]:
-        X, Y = dataset
+        # x, y = dataset
         losses = []
         accuracys = []
-        for idx in range(0, len(X)-BATCH_SIZE, BATCH_SIZE):
-            x = X[idx:idx+BATCH_SIZE]
-            y = Y[idx:idx+BATCH_SIZE]
-
+        # for idx in range(0, len(X)-BATCH_SIZE, BATCH_SIZE):
+        #     x = X[idx:idx+BATCH_SIZE]
+        #     y = Y[idx:idx+BATCH_SIZE]
+        for x, y in dataset:
             y_prim = model.forward(torch.FloatTensor(x))
             y = torch.FloatTensor(y)
 
@@ -105,7 +145,7 @@ for epoch in range(1, 20000):
 
     print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]} accuracy_train: {accuracy_plot_train[-1]} accuracy_test: {accuracy_plot_test[-1]}')
 
-    if epoch % 500 == 0:
+    if epoch % 100 == 0:
         plt.subplot(2,1,1)
         plt.plot(loss_plot_train)
         plt.plot(loss_plot_test)
