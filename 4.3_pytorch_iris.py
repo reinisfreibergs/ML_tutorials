@@ -78,7 +78,7 @@ for epoch in range(1, 20000):
 
             y_idx = torch.argmax(y, dim = 1, keepdim = True)
             y_prim_out = torch.gather(y_prim, 1, y_idx)
-            idx_y_prim = torch.argmax(y_prim, dim=1)
+            idx_y_prim = torch.argmax(y_prim, dim=1, keepdim = True)
 
             loss = torch.mean(y_prim * torch.log((y_prim + 1e-8) / (y + 1e-8))) - torch.sum(y_prim) + torch.sum(y)
             # loss = torch.mean(-torch.log(y_prim_out + 1e-8)) #LossCrossEntropy loss function
