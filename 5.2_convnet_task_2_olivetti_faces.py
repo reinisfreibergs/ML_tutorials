@@ -29,8 +29,8 @@ class DatasetOlivetti(torch.utils.data.Dataset):
         self.data = list(zip(self.X, self.Y))
 
     def __len__(self):
-        if MAX_LEN:
-            return MAX_LEN
+        # if MAX_LEN:
+        #     return MAX_LEN
         return len(self.data)
 
     def __getitem__(self, idx):
@@ -122,11 +122,11 @@ class Model(torch.nn.Module):
 
         out_channels = 12
         self.encoder = torch.nn.Sequential(
-            Conv2d(in_channels=1, out_channels=3, kernel_size=5, stride=2, padding=1),
+            torch.nn.Conv2d(in_channels=1, out_channels=3, kernel_size=5, stride=2, padding=1),
             torch.nn.ReLU(),
-            Conv2d(in_channels=3, out_channels=6, kernel_size=3, stride=2, padding=1),
+            torch.nn.Conv2d(in_channels=3, out_channels=6, kernel_size=3, stride=2, padding=1),
             torch.nn.ReLU(),
-            Conv2d(in_channels=6, out_channels=out_channels, kernel_size=3, stride=2, padding=1)
+            torch.nn.Conv2d(in_channels=6, out_channels=out_channels, kernel_size=3, stride=2, padding=1)
         )
 
         o_1 = get_out_size(INPUT_SIZE, kernel_size=5, stride=2, padding=1)
@@ -160,6 +160,7 @@ for stage in ['train', 'test']:
         metrics[f'{stage}_{metric}'] = []
 
 for epoch in range(1, 150):
+    images = []
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -169,6 +170,8 @@ for epoch in range(1, 150):
 
         for x, y in data_loader:
 
+            if epoch % 50 == 0:
+                images.append(x)
 
             x = x.to(DEVICE)
             y = y.to(DEVICE)
@@ -211,3 +214,19 @@ for epoch in range(1, 150):
 
     plt.legend(plts, [it.get_label() for it in plts])
     plt.show()
+
+
+    if epoch % 50 == 0:
+        k=1
+        for image_batch in reversed(images):
+            for picture in reversed(image_batch):
+
+                np_picture = np.array(picture)
+                np_picture_reshaped = np.reshape(np_picture, (64,64))
+
+                imgplot = plt.imshow(np_picture_reshaped)
+                if k < 17:
+                    plt.legend('image',title = idx_y_prim[-k], facecolor = 'red', fontsize = 10, labelcolor = 'white')
+                    print(idx_y_prim)
+                    plt.show()
+                    k+=1
