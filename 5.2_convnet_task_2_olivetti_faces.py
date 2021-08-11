@@ -170,9 +170,6 @@ for epoch in range(1, 150):
 
         for x, y in data_loader:
 
-            if epoch % 50 == 0:
-                images.append(x)
-
             x = x.to(DEVICE)
             y = y.to(DEVICE)
 
@@ -183,6 +180,9 @@ for epoch in range(1, 150):
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
+            else:
+                if epoch % 50 == 0:
+                    images.append(x)
 
             np_y_prim = y_prim.cpu().data.numpy()
             np_y = y.cpu().data.numpy()
