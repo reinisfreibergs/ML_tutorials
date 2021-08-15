@@ -121,7 +121,7 @@ for epoch in range(1, 20000):
 
             indexes = range(len(y_idx))
             y_prim_out = y_prim[indexes, y_idx]
-            
+
             # loss = torch.mean(y_prim * torch.log((y_prim + 1e-8) / (y + 1e-8))) - torch.sum(y_prim) + torch.sum(y)
             loss = torch.mean(-torch.log(y_prim_out + 1e-8)) #LossCrossEntropy loss function
 
