@@ -1,3 +1,4 @@
+import sklearn.datasets
 import torch
 import numpy as np
 import matplotlib
@@ -67,11 +68,41 @@ class Model(torch.nn.Module):
 
     def __init__(self):
         super().__init__()
-        #TODO
+        self.layers = torch.nn.Sequential(
+            torch.nn.Conv2d(
+                kernel_size=5, stride=2, padding=1,
+                in_channels=1,
+                out_channels=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=2),
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=2,
+                out_channels=4),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=4),
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=4,
+                out_channels=8),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.MaxPool2d(
+                kernel_size=2, stride=2, padding=0
+            )
+        )
+        self.fc = torch.nn.Linear(
+            in_features=8*15*11,
+            out_features = 5749
+        )
 
     def forward(self, x):
-        #TODO implement
-        return torch.ones((x.size(0), 10))
+        z = self.layers.forward(x)
+        z_reshaped = z.view(x.size(0), -1)
+        y_logits = self.fc.forward(z_reshaped)
+        y_prim = torch.softmax(y_logits, dim=1)
+
+        return y_prim
 
 
 model = Model()
@@ -102,7 +133,11 @@ for epoch in range(1, 100):
             y = y.to(DEVICE)
             y_prim = model.forward(x)
 
-            loss = torch.sum(-y*torch.log(y_prim + 1e-8))
+            y_idx = torch.argmax(y, dim = 1)
+            indexes = range(len(y_idx))
+            y_prim_out = y_prim[indexes, y_idx]
+
+            loss = torch.sum(-1*torch.log(y_prim_out + 1e-8))
             # Sum dependant on batch size => larger LR
             # Mean independant of batch size => smaller LR
 
