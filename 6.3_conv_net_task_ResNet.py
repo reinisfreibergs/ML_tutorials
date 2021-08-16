@@ -1,3 +1,4 @@
+import sklearn.datasets
 import torch
 import numpy as np
 import matplotlib
@@ -62,19 +63,84 @@ data_loader_test = torch.utils.data.DataLoader(
     shuffle=False
 )
 
+class ResBlock(torch.nn.Module):
 
-class Model(torch.nn.Module):
+    def __init__(self, in_features):
+        super().__init__()
+
+        self.upper_layers = torch.nn.Sequential(
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=in_features,
+                out_channels=in_features),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=in_features),
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=in_features,
+                out_channels=in_features)
+        )
+
+        self.lower_layers = torch.nn.Sequential(
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=in_features)
+        )
+
+    def forward(self, x):
+        z = self.upper_layers.forward(x)
+        z_prim = z + x
+
+        z_lower = self.lower_layers.forward(z_prim)
+
+        return z_lower
+
+
+class ResNet(torch.nn.Module):
 
     def __init__(self):
         super().__init__()
-        #TODO
+        self.layers = torch.nn.Sequential(
+            ResBlock(in_features=1),
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=1,
+                out_channels=32),
+            torch.nn.MaxPool2d(
+                kernel_size=2, stride=2, padding=0
+            ),
+            ResBlock(in_features=32),
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=32,
+                out_channels=64),
+            torch.nn.MaxPool2d(
+                kernel_size=2, stride=2, padding=0
+            ),
+            ResBlock(in_features=64),
+            torch.nn.Conv2d(
+                kernel_size=3, stride=1, padding=1,
+                in_channels=64,
+                out_channels=128),
+            torch.nn.MaxPool2d(
+                kernel_size=2, stride=2, padding=0
+            ),
+            torch.nn.AdaptiveAvgPool2d(output_size=(1,1))
+        )
+        self.fc = torch.nn.Linear(
+            in_features=128,
+            out_features=5749
+        )
 
     def forward(self, x):
-        #TODO implement
-        return torch.ones((x.size(0), 10))
+        z = self.layers.forward(x)
+        z_reshaped = z.squeeze()
+        y_logits = self.fc.forward(z_reshaped)
+        y_prim = torch.softmax(y_logits, dim=1)
+
+        return y_prim
 
 
-model = Model()
+model = ResNet()
 model = model.to(DEVICE)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)
 
@@ -102,7 +168,11 @@ for epoch in range(1, 100):
             y = y.to(DEVICE)
             y_prim = model.forward(x)
 
-            loss = torch.sum(-y*torch.log(y_prim + 1e-8))
+            y_idx = torch.argmax(y, dim = 1)
+            indexes = range(len(y_idx))
+            y_prim_out = y_prim[indexes, y_idx]
+
+            loss = torch.sum(-1*torch.log(y_prim_out + 1e-8))
             # Sum dependant on batch size => larger LR
             # Mean independant of batch size => smaller LR
 
