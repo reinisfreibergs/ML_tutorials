@@ -39,9 +39,7 @@ class Dataset_Lfw_people(torch.utils.data.Dataset):
         np_x_reshaped = np.reshape(np_x, (1,62,47))
         x = torch.FloatTensor(np_x_reshaped)
 
-        y = np.zeros((5749,))
-        y[y_idx] = 1.0
-        y = torch.FloatTensor(y)
+        y = torch.LongTensor([y_idx])
 
         return x, y
 
@@ -130,12 +128,11 @@ for epoch in range(1, 100):
         for x, y in data_loader:
 
             x = x.to(DEVICE)
-            y = y.to(DEVICE)
+            y = y.to(DEVICE).squeeze()
             y_prim = model.forward(x)
 
-            y_idx = torch.argmax(y, dim = 1)
-            indexes = range(len(y_idx))
-            y_prim_out = y_prim[indexes, y_idx]
+            indexes = range(len(y_prim))
+            y_prim_out = y_prim[indexes, y]
 
             loss = torch.sum(-1*torch.log(y_prim_out + 1e-8))
             # Sum dependant on batch size => larger LR
@@ -154,10 +151,10 @@ for epoch in range(1, 100):
             np_y_prim = y_prim.cpu().data.numpy()
             np_y = y.cpu().data.numpy()
 
-            idx_y = np.argmax(np_y, axis=1)
+
             idx_y_prim = np.argmax(np_y_prim, axis=1)
 
-            acc = np.mean((idx_y == idx_y_prim) * 1.0)
+            acc = np.mean((np_y == idx_y_prim) * 1.0)
             metrics_epoch[f'{stage}_acc'].append(acc)
 
         metrics_strs = []
