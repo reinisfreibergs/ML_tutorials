@@ -7,7 +7,15 @@ import torch.nn.functional
 import matplotlib.pyplot as plt
 import torch.utils.data
 from scipy.ndimage import gaussian_filter1d
+from csv import writer
+import time
 
+header = ['ConvNet1']
+
+with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
+    writer_object = writer(f_object)
+    writer_object.writerow(header)
+    # f_object.close()
 
 MAX_LEN = 200 # For debugging, reduce number of samples
 BATCH_SIZE = 16
@@ -113,9 +121,11 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
-for epoch in range(1, 100):
+start = time.time()
+for epoch in range(1, 30):
     plt.clf()
-
+    metrics_csv = []
+    metrics_csv.append(epoch)
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -163,10 +173,12 @@ for epoch in range(1, 100):
 
         print(f'epoch: {epoch} {" ".join(metrics_strs)}')
 
+
     plt.clf()
     plts = []
     c = 0
     for key, value in metrics.items():
+        metrics_csv.append(value[-1])
         value = gaussian_filter1d(value, sigma=2)
 
         plts += plt.plot(value, f'C{c}', label=key)
@@ -177,3 +189,14 @@ for epoch in range(1, 100):
     # plt.show()
     plt.draw()
     plt.pause(0.1)
+
+    with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
+        writer_object = writer(f_object)
+        writer_object.writerow(metrics_csv)
+
+dt =time.time() - start
+with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
+    writer_object = writer(f_object)
+    writer_object.writerow([dt])
+
+print(dt)
