@@ -84,11 +84,43 @@ class ShuffleNetBlock(torch.nn.Module):
         # DW convolution is Conv2D where in_features == groups
         # GConvolution id Conv2D with groups parameter
         self.layers = torch.nn.Sequential(
-
+            torch.nn.Conv2d(
+                in_channels=in_features,
+                out_channels=in_features,
+                groups=num_groups,
+                kernel_size=1,
+                stride=1,
+                padding=0
+            ),
+            torch.nn.BatchNorm2d(num_features=in_features),
+            torch.nn.ReLU(),
+            Shuffle(groups=num_groups),
+            torch.nn.Conv2d(
+                in_channels=in_features,
+                out_channels=in_features,
+                groups=in_features,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            torch.nn.BatchNorm2d(num_features=in_features),
+            torch.nn.Conv2d(
+                in_channels=in_features,
+                out_channels=in_features,
+                groups=num_groups,
+                kernel_size=1,
+                stride=1,
+                padding=0
+            ),
+            torch.nn.BatchNorm2d(num_features=in_features),
         )
+
     def forward(self, x):
-        # TODO implement forward
-        return x
+        z = self.layers.forward(x)
+        z_prim = z + x
+        z_lower = torch.nn.ReLU().forward(z_prim)
+
+        return z_lower
 
 
 class Reshape(torch.nn.Module):
