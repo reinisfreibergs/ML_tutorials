@@ -9,6 +9,7 @@ import torch.utils.data
 from scipy.ndimage import gaussian_filter1d
 from csv import writer
 import time
+from sklearn.model_selection import train_test_split
 
 header = ['ConvNet3_ResNet 128 out channels']
 
@@ -30,8 +31,10 @@ class Dataset_Lfw_people(torch.utils.data.Dataset):
 
         self.X, self.Y = sklearn.datasets.fetch_lfw_people(
             return_X_y=True,
-            download_if_missing=True
+            download_if_missing=True,
+            min_faces_per_person = 100 #157 persons, 4324 images
         )
+        # self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(self.X, self.Y, test_size=0.2, random_state=0, stratify=self.Y)
         self.data = list(zip(self.X, self.Y))
 
     def __len__(self):
@@ -40,35 +43,41 @@ class Dataset_Lfw_people(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        x_idx, y_idx = self.data[idx]
+        # x_idx, y_idx = self.data[idx]
 
-        np_x = np.array(x_idx)
+        np_x = np.array(idx[0])
         np_x_reshaped = np.reshape(np_x, (1,62,47))
         x = torch.FloatTensor(np_x_reshaped)
 
-        y = torch.LongTensor([y_idx])
+        y = torch.LongTensor([idx[1]])
 
         return x, y
 
 
 init_dataset = Dataset_Lfw_people()
-length_train = int(len(init_dataset)*0.8)
-lengths = [length_train, len(init_dataset) - length_train]
-subsetA, subsetB = torch.utils.data.random_split(init_dataset, lengths, generator=torch.Generator().manual_seed(0))
+y = init_dataset.Y
+subset_train, subset_test = train_test_split(init_dataset.data, test_size=0.2, random_state=0, stratify=y)
+# length_train = int(len(init_dataset)*0.8)
+# lengths = [length_train, len(init_dataset) - length_train]
+# subsetA, subsetB = torch.utils.data.random_split(init_dataset, lengths, generator=torch.Generator().manual_seed(0))
 
+train_samples = torch.utils.data.SubsetRandomSampler(subset_train)
+test_samples = torch.utils.data.SubsetRandomSampler(subset_test)
 
 data_loader_train = torch.utils.data.DataLoader(
-    dataset = subsetA,
+    dataset = init_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=True,
-    drop_last=True
+    # shuffle=True,
+    drop_last=True,
+    sampler=train_samples
 )
 
 data_loader_test = torch.utils.data.DataLoader(
-    dataset = subsetB,
+    dataset = init_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=False,
-    drop_last=True
+    # shuffle=False,
+    drop_last=True,
+    sampler=test_samples
 )
 
 class ResBlock(torch.nn.Module):
