@@ -59,20 +59,99 @@ data_loader_test = torch.utils.data.DataLoader(
 )
 
 class DenseBlock(torch.nn.Module):
-    def __init__(self, in_features):
+    def __init__(self, in_features, num_chains=4):
         super().__init__()
 
+        self.chains = []
+
+        for i in range(num_chains):
+            out_features = (i+1)*in_features
+            self.chains.append(torch.nn.Sequential(
+                torch.nn.ReLU(),
+                torch.nn.BatchNorm2d(out_features),
+                torch.nn.Conv2d(
+                    in_channels=out_features,
+                    out_channels=in_features,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            ).to(DEVICE))
+
+    def parameters(self):
+        return reduce(lambda a, b: a+b, [list(it.parameters()) for it in self.chains])
+
+    def to(self, device):
+        for i in range(num_chains):
+            self.chains[i] = self.chains[i].to(device)
+
     def forward(self, x):
-        return x
+        inp = x
+        list_out = [x]
+        for chain in self.chains:
+            out = chain.forward(inp)
+            list_out.append(out)
+            inp = torch.cat(list_out, dim=1) #(batch, channel, H, W)
+
+        return inp
+
+class TransitionLayer(torch.nn.Module):
+    def __init__(self, in_features, out_features):
+        super().__init__()
+
+        self.layers = torch.nn.Sequential(
+            torch.nn.Conv2d(
+                in_channels=in_features,
+                out_channels=out_features,
+                kernel_size=1,
+                stride=1,
+                padding=0
+            ),
+            torch.nn.AvgPool2d(
+                kernel_size=2,
+                stride=2,
+                padding=0
+            )
+        )
+    def forward(self, x):
+        return self.layers.forward(x)
+
+class Reshape(torch.nn.Module):
+    def __init__(self, target_shape):
+        super().__init__()
+        self.target_shape = target_shape
+
+    def forward(self, x):
+        return x.view(self.target_shape)
 
 class DenseNet(torch.nn.Module):
     def __init__(self):
         super().__init__()
+        num_channels = 16
         self.layers = torch.nn.Sequential(
+            torch.nn.Conv2d(
+                in_channels=1,
+                out_channels=num_channels,
+                kernel_size=7,
+                stride=1,
+                padding=1
+            ),
+            DenseBlock(in_features=num_channels),
+            TransitionLayer(in_features=num_channels+4*num_channels, out_features=num_channels),
+            DenseBlock(in_features=num_channels),
+            TransitionLayer(in_features=num_channels+4*num_channels, out_features=num_channels),
+            DenseBlock(in_features=num_channels),
+            TransitionLayer(in_features=num_channels+4*num_channels, out_features=num_channels),
+            DenseBlock(in_features=num_channels),
+            TransitionLayer(in_features=num_channels+4*num_channels, out_features=num_channels),
+            torch.nn.AdaptiveAvgPool2d(output_size=1),
+            Reshape(target_shape=(-1, num_channels)),
+            torch.nn.Linear(in_features=num_channels, out_features=10),
+            torch.nn.Softmax(dim=1)
         )
 
     def forward(self, x):
-        return x
+        return self.layers.forward(x)
 
 model = DenseNet()
 model = model.to(DEVICE)
