@@ -52,20 +52,23 @@ class Dataset_Lfw_people(torch.utils.data.Dataset):
 
 
 init_dataset = Dataset_Lfw_people()
-lengths = [int(len(init_dataset)*0.8)+1, int(len(init_dataset)*0.2)]
+length_train = int(len(init_dataset)*0.8)
+lengths = [length_train, len(init_dataset) - length_train]
 subsetA, subsetB = torch.utils.data.random_split(init_dataset, lengths, generator=torch.Generator().manual_seed(0))
 
 
 data_loader_train = torch.utils.data.DataLoader(
     dataset = subsetA,
     batch_size=BATCH_SIZE,
-    shuffle=True
+    shuffle=True,
+    drop_last=True
 )
 
 data_loader_test = torch.utils.data.DataLoader(
     dataset = subsetB,
     batch_size=BATCH_SIZE,
-    shuffle=False
+    shuffle=False,
+    drop_last=True
 )
 
 class ResBlock(torch.nn.Module):
