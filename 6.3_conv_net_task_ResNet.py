@@ -107,7 +107,7 @@ class ResNet(torch.nn.Module):
         self.layers = torch.nn.Sequential(
             ResBlock(in_features=1),
             torch.nn.Conv2d(
-                kernel_size=3, stride=1, padding=1,
+                kernel_size=1, stride=1, padding=0,
                 in_channels=1,
                 out_channels=32),
             torch.nn.MaxPool2d(
@@ -115,7 +115,7 @@ class ResNet(torch.nn.Module):
             ),
             ResBlock(in_features=32),
             torch.nn.Conv2d(
-                kernel_size=3, stride=1, padding=1,
+                kernel_size=1, stride=1, padding=0,
                 in_channels=32,
                 out_channels=64),
             torch.nn.MaxPool2d(
@@ -123,7 +123,7 @@ class ResNet(torch.nn.Module):
             ),
             ResBlock(in_features=64),
             torch.nn.Conv2d(
-                kernel_size=3, stride=1, padding=1,
+                kernel_size=1, stride=1, padding=0,
                 in_channels=64,
                 out_channels=128),
             torch.nn.MaxPool2d(
@@ -225,13 +225,13 @@ for epoch in range(1, 100):
     plt.draw()
     plt.pause(0.1)
 
-    with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
-        writer_object = writer(f_object)
-        writer_object.writerow(metrics_csv)
-
-dt =time.time() - start
-with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
-    writer_object = writer(f_object)
-    writer_object.writerow([dt])
-
-print(dt)
+#     with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
+#         writer_object = writer(f_object)
+#         writer_object.writerow(metrics_csv)
+#
+# dt =time.time() - start
+# with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
+#     writer_object = writer(f_object)
+#     writer_object.writerow([dt])
+#
+# print(dt)
