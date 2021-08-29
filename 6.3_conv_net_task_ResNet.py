@@ -7,18 +7,27 @@ import torch.nn.functional
 import matplotlib.pyplot as plt
 import torch.utils.data
 from scipy.ndimage import gaussian_filter1d
-from csv import writer
 import time
 from sklearn.model_selection import train_test_split
+import argparse
+from file_utils import FileUtils
+import csv_result_parser as result_parser
 
-header = ['ConvNet3_ResNet 128 out channels']
 
-with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
-    writer_object = writer(f_object)
-    writer_object.writerow(header)
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-epochs', default=5, type=int, nargs='+')
+parser.add_argument('-batch_size', default=16, type=int, nargs='+')
+parser.add_argument('-learning_rate', default=1e-4, type=float, nargs='+')
+parser.add_argument('-results_dir', default='7_results/', type=str)
+parser.add_argument('-comparison_file', default='7.5_comparison_results.csv', type=str)
+
+
+args = parser.parse_args()
+FileUtils.createDir(args.results_dir)
 
 MAX_LEN = 200 # For debugging, reduce number of samples
-BATCH_SIZE = 16
+BATCH_SIZE = args.batch_size
 
 DEVICE = 'cpu'
 if torch.cuda.is_available():
@@ -159,7 +168,7 @@ class ResNet(torch.nn.Module):
 
 model = ResNet()
 model = model.to(DEVICE)
-optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)
+optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
 
 metrics = {}
 for stage in ['train', 'test']:
@@ -170,7 +179,8 @@ for stage in ['train', 'test']:
         metrics[f'{stage}_{metric}'] = []
 
 start = time.time()
-for epoch in range(1, 100):
+filename = result_parser.run_file_name()
+for epoch in range(1, args.epochs):
     plt.clf()
     metrics_csv = []
     metrics_csv.append(epoch)
@@ -237,13 +247,10 @@ for epoch in range(1, 100):
     plt.draw()
     plt.pause(0.1)
 
-#     with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
-#         writer_object = writer(f_object)
-#         writer_object.writerow(metrics_csv)
-#
-# dt =time.time() - start
-# with open('6.4_ConvNet_comparison.csv', 'a',newline='') as f_object:
-#     writer_object = writer(f_object)
-#     writer_object.writerow([dt])
-#
-# print(dt)
+    result_parser.run_csv(file_name=args.results_dir + filename,
+                          metrics=metrics_csv)
+
+result_parser.best_result_csv(result_file=args.comparison_file,
+                                run_file=args.results_dir + filename,
+                                batch_size= args.batch_size,
+                                learning_rate=args.learning_rate)
