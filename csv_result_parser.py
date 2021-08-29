@@ -25,7 +25,7 @@ def run_csv(file_name, metrics):
 
         writer_object.writerow(metrics)
 
-def best_result_csv(result_file, run_file, batch_size, learning_rate):
+def best_result_csv(result_file, run_file,run_name, batch_size, learning_rate):
 
     read_file = pd.read_csv(run_file)
     max_epochs = read_file['epoch'].max()
@@ -34,7 +34,7 @@ def best_result_csv(result_file, run_file, batch_size, learning_rate):
     min_test_loss = read_file['test_loss'].min()
     max_test_acc = read_file['test_acc'].max()
 
-    result_row = [run_file,
+    result_row = [run_name,
                   max_epochs,
                   batch_size,
                   learning_rate,
