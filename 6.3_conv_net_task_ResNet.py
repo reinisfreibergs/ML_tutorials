@@ -16,9 +16,9 @@ import csv_result_parser as result_parser
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('-epochs', default=5, type=int, nargs='+')
-parser.add_argument('-batch_size', default=16, type=int, nargs='+')
-parser.add_argument('-learning_rate', default=1e-4, type=float, nargs='+')
+parser.add_argument('-epochs', default=5, type=int)
+parser.add_argument('-batch_size', default=16, type=int)
+parser.add_argument('-learning_rate', default=1e-4, type=float)
 parser.add_argument('-results_dir', default='7_results/', type=str)
 parser.add_argument('-comparison_file', default='7.5_comparison_results.csv', type=str)
 
@@ -41,7 +41,7 @@ class Dataset_Lfw_people(torch.utils.data.Dataset):
         self.X, self.Y = sklearn.datasets.fetch_lfw_people(
             return_X_y=True,
             download_if_missing=True,
-            min_faces_per_person = 100 #157 persons, 4324 images
+            min_faces_per_person = 10 #157 persons, 4324 images
         )
         # self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(self.X, self.Y, test_size=0.2, random_state=0, stratify=self.Y)
         self.data = list(zip(self.X, self.Y))

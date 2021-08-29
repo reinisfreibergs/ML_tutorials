@@ -1,6 +1,6 @@
 import random
 from functools import reduce
-
+import sklearn.datasets
 import torch
 import numpy as np
 import matplotlib
@@ -9,6 +9,22 @@ import torch.nn.functional
 import matplotlib.pyplot as plt
 import torch.utils.data
 from scipy.ndimage import gaussian_filter1d
+from sklearn.model_selection import train_test_split
+import argparse
+from file_utils import FileUtils
+import csv_result_parser as result_parser
+
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-epochs', default=5, type=int)
+parser.add_argument('-batch_size', default=16, type=int)
+parser.add_argument('-learning_rate', default=1e-4, type=float)
+parser.add_argument('-results_dir', default='7_results/', type=str)
+parser.add_argument('-comparison_file', default='7.5_comparison_results.csv', type=str)
+
+args = parser.parse_args()
+FileUtils.createDir(args.results_dir)
 
 
 MAX_LEN = 200 # For debugging, reduce number of samples
@@ -19,14 +35,17 @@ if torch.cuda.is_available():
     DEVICE = 'cuda'
     MAX_LEN = 0
 
-class DatasetFassionMNIST(torch.utils.data.Dataset):
-    def __init__(self, is_train):
+class Dataset_Lfw_people(torch.utils.data.Dataset):
+    def __init__(self):
         super().__init__()
-        self.data = torchvision.datasets.FashionMNIST(
-            root='../data',
-            train=is_train,
-            download=True
+
+        self.X, self.Y = sklearn.datasets.fetch_lfw_people(
+            return_X_y=True,
+            download_if_missing=True,
+            min_faces_per_person = 10 #157 persons, 4324 images
         )
+        # self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(self.X, self.Y, test_size=0.2, random_state=0, stratify=self.Y)
+        self.data = list(zip(self.X, self.Y))
 
     def __len__(self):
         if MAX_LEN:
@@ -34,29 +53,38 @@ class DatasetFassionMNIST(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # list tuple np.array torch.FloatTensor
-        pil_x, y_idx = self.data[idx]
-        np_x = np.array(pil_x)
-        np_x = np.expand_dims(np_x, axis=0) # (1, W, H)
+        # x_idx, y_idx = self.data[idx]
 
-        x = torch.FloatTensor(np_x)
-        np_y = np.zeros((10,))
-        np_y[y_idx] = 1.0
+        np_x = np.array(idx[0])
+        np_x_reshaped = np.reshape(np_x, (1,62,47))
+        x = torch.FloatTensor(np_x_reshaped)
 
-        y = torch.FloatTensor(np_y)
+        y = torch.LongTensor([idx[1]])
+
         return x, y
 
 
+init_dataset = Dataset_Lfw_people()
+y = init_dataset.Y
+subset_train, subset_test = train_test_split(init_dataset.data, test_size=0.2, random_state=0, stratify=y)
+
+train_samples = torch.utils.data.SubsetRandomSampler(subset_train)
+test_samples = torch.utils.data.SubsetRandomSampler(subset_test)
+
 data_loader_train = torch.utils.data.DataLoader(
-    dataset=DatasetFassionMNIST(is_train=True),
+    dataset = init_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=True
+    # shuffle=True,
+    drop_last=True,
+    sampler=train_samples
 )
 
 data_loader_test = torch.utils.data.DataLoader(
-    dataset=DatasetFassionMNIST(is_train=False),
+    dataset = init_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=False
+    # shuffle=False,
+    drop_last=True,
+    sampler=test_samples
 )
 
 
@@ -155,12 +183,12 @@ class ShuffleNet(torch.nn.Module):
     def forward(self, x):
         return self.layers.forward(x)
 
+# model = ShuffleNet()
+# inp = torch.ones((BATCH_SIZE, 1, 28, 28))
+# out = model.forward(inp)
 model = ShuffleNet()
-inp = torch.ones((BATCH_SIZE, 1, 28, 28))
-out = model.forward(inp)
-
 model = model.to(DEVICE)
-optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)
+optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
 
 metrics = {}
 for stage in ['train', 'test']:
@@ -170,9 +198,11 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
-for epoch in range(1, 100):
+filename = result_parser.run_file_name()
+for epoch in range(1, args.epochs):
     plt.clf()
-
+    metrics_csv = []
+    metrics_csv.append(epoch)
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -222,6 +252,7 @@ for epoch in range(1, 100):
     plts = []
     c = 0
     for key, value in metrics.items():
+        metrics_csv.append(value[-1])
         value = gaussian_filter1d(value, sigma=2)
 
         plts += plt.plot(value, f'C{c}', label=key)
@@ -229,4 +260,14 @@ for epoch in range(1, 100):
         c += 1
 
     plt.legend(plts, [it.get_label() for it in plts])
-    plt.show()
+    # plt.show()
+    plt.draw()
+    plt.pause(0.1)
+
+    result_parser.run_csv(file_name=args.results_dir + filename,
+                          metrics=metrics_csv)
+
+result_parser.best_result_csv(result_file=args.comparison_file,
+                                run_file=args.results_dir + filename,
+                                batch_size= args.batch_size,
+                                learning_rate=args.learning_rate)
