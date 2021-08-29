@@ -269,5 +269,6 @@ for epoch in range(1, args.epochs):
 
 result_parser.best_result_csv(result_file=args.comparison_file,
                                 run_file=args.results_dir + filename,
+                                run_name=filename,
                                 batch_size= args.batch_size,
                                 learning_rate=args.learning_rate)
