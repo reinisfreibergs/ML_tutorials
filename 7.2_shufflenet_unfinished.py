@@ -177,7 +177,7 @@ class ShuffleNet(torch.nn.Module):
             ShuffleNetBlock(in_features=num_channels, num_groups=num_groups),
             torch.nn.AdaptiveAvgPool2d(output_size=1),  #(B, num_channels, 1, 1)
             Reshape(target_shape=(-1, num_channels)),
-            torch.nn.Linear(in_features=num_channels, out_features=10),
+            torch.nn.Linear(in_features=num_channels, out_features=158),
             torch.nn.Softmax(dim=1)
         )
     def forward(self, x):
@@ -213,10 +213,14 @@ for epoch in range(1, args.epochs):
         for x, y in data_loader:
 
             x = x.to(DEVICE)
-            y = y.to(DEVICE)
+            y = y.to(DEVICE).squeeze()
             y_prim = model.forward(x)
 
-            loss = torch.sum(-y*torch.log(y_prim + 1e-8))
+
+            indexes = range(len(y_prim))
+            y_prim_out = y_prim[indexes, y]
+
+            loss = torch.sum(-1*torch.log(y_prim_out + 1e-8))
             # Sum dependant on batch size => larger LR
             # Mean independant of batch size => smaller LR
 
@@ -233,10 +237,9 @@ for epoch in range(1, args.epochs):
             np_y_prim = y_prim.cpu().data.numpy()
             np_y = y.cpu().data.numpy()
 
-            idx_y = np.argmax(np_y, axis=1)
             idx_y_prim = np.argmax(np_y_prim, axis=1)
 
-            acc = np.mean((idx_y == idx_y_prim) * 1.0)
+            acc = np.mean((np_y == idx_y_prim) * 1.0)
             metrics_epoch[f'{stage}_acc'].append(acc)
 
         metrics_strs = []

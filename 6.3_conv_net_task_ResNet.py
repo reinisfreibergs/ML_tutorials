@@ -154,7 +154,7 @@ class ResNet(torch.nn.Module):
         )
         self.fc = torch.nn.Linear(
             in_features=128,
-            out_features=5749
+            out_features=158
         )
 
     def forward(self, x):
