@@ -17,8 +17,8 @@ import torch.utils.data
 import scipy.misc
 import scipy.ndimage
 
-model_path = 'C:\\Users\\vecin\\Documents\\PycharmProjects\\viaa-ml-course-2020\\session_8_pytorch_ae\\Autoencoder_weights.pt'
-USE_PRETRAINED = False
+model_path = 'D:\\project\\Autoencoder_weights.pt'
+USE_PRETRAINED = True
 USE_CUDA = torch.cuda.is_available()
 MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
 # if USE_CUDA:
@@ -28,7 +28,7 @@ MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU 
 class DatasetEMNIST(torch.utils.data.Dataset):
     def __init__(self, is_train):
         self.data = torchvision.datasets.EMNIST(
-            root='./data',
+            root='D:/pythonProject/data',
             train=is_train,
             split='bymerge',
             download=True
@@ -92,10 +92,50 @@ class LossCrossEntropy(torch.nn.Module):
 class Autoencoder(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        # TODO
+        self.encoder = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels=1,out_channels=4,kernel_size=5),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=4),
+            torch.nn.Conv2d(in_channels=4,out_channels=8,kernel_size=4, padding=1, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.Conv2d(in_channels=8, out_channels=8, kernel_size=7),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=4, padding=1, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+            torch.nn.Conv2d(in_channels=16, out_channels=16, kernel_size=4, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+            torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, padding=1, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=32)
+        )
+
+        self.decoder = torch.nn.Sequential(
+            torch.nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=4, padding=1, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+            torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=4, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+            torch.nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=4, padding=1, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.ConvTranspose2d(in_channels=8, out_channels=8, kernel_size=7),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.ConvTranspose2d(in_channels=8, out_channels=4, kernel_size=4, padding=1, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm2d(num_features=4),
+            torch.nn.ConvTranspose2d(in_channels=4, out_channels=1, kernel_size=5),
+            torch.nn.Sigmoid()
+        )
 
     def forward(self, x):
-        # TODO
+        out = self.encoder.forward(x)
+        out = self.decoder.forward(out)
         return out
 
 
@@ -138,7 +178,7 @@ if not USE_PRETRAINED:
                     y = y.cuda()
 
                 y_prim = model.forward(x)
-                loss = 0
+                loss = torch.mean((y_prim - y)**2)
                 # TODO
                 metrics_epoch[f'{stage}_loss'].append(loss.item()) # Tensor(0.1) => 0.1f
 
