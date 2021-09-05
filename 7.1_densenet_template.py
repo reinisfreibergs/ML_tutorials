@@ -90,7 +90,7 @@ class DenseBlock(torch.nn.Module):
     def __init__(self, in_features, num_chains=4):
         super().__init__()
 
-        self.chains = []
+        self.chains = torch.nn.ModuleList()
 
         for i in range(num_chains):
             out_features = (i+1)*in_features
@@ -105,13 +105,6 @@ class DenseBlock(torch.nn.Module):
                     padding=1,
                 )
             ).to(DEVICE))
-
-    def parameters(self):
-        return reduce(lambda a, b: a+b, [list(it.parameters()) for it in self.chains])
-
-    def to(self, device):
-        for i in range(num_chains):
-            self.chains[i] = self.chains[i].to(device)
 
     def forward(self, x):
         inp = x
