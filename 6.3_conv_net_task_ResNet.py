@@ -1,3 +1,4 @@
+import numpy
 import sklearn.datasets
 import torch
 import numpy as np
@@ -12,6 +13,7 @@ from sklearn.model_selection import train_test_split
 import argparse
 from file_utils import FileUtils
 import csv_result_parser as result_parser
+import pandas as pd
 
 
 parser = argparse.ArgumentParser()
@@ -222,6 +224,8 @@ for epoch in range(1, args.epochs):
             acc = np.mean((np_y == idx_y_prim) * 1.0)
             metrics_epoch[f'{stage}_acc'].append(acc)
 
+            np_idx_y_prim = np.array(idx_y_prim)
+
         metrics_strs = []
         for key in metrics_epoch.keys():
             if stage in key:
@@ -247,6 +251,7 @@ for epoch in range(1, args.epochs):
     plt.draw()
     plt.pause(0.1)
 
+
     result_parser.run_csv(file_name=args.results_dir + filename,
                           metrics=metrics_csv)
 
@@ -255,3 +260,22 @@ result_parser.best_result_csv(result_file=args.comparison_file,
                                 run_name=filename,
                                 batch_size= args.batch_size,
                                 learning_rate=args.learning_rate)
+
+
+nb_classes = 158
+confusion_matrix = np.zeros((nb_classes, nb_classes))
+
+with torch.no_grad():
+    for x, y in data_loader_test:
+        x = x.to(DEVICE)
+        y = y.to(DEVICE)
+        y_prim = model.forward(x)
+
+        np_y_prim = y_prim.cpu().data.numpy()
+        idx_y_prim = np.argmax(np_y_prim, axis=1)
+        np_y = y.cpu().data.numpy()
+
+        for i,j in zip(np_y.squeeze(), idx_y_prim.squeeze()):
+            confusion_matrix[i, j] += 1
+
+pd.DataFrame(confusion_matrix).to_csv("confusion_matrix_ResNet.csv")
