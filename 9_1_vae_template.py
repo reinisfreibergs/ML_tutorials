@@ -96,13 +96,65 @@ data_loader_test = torch.utils.data.DataLoader(
 class VAE(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.encoder = torch.nn.Sequential( #TODO
+        self.encoder = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels=1, out_channels=4, kernel_size=5),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=4),
+
+            torch.nn.Conv2d(in_channels=4, out_channels=8, kernel_size=4, padding=1, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+
+            torch.nn.Conv2d(in_channels=8, out_channels=8, kernel_size=7),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+
+            torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=4, padding=1, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+
+            torch.nn.Conv2d(in_channels=16, out_channels=16, kernel_size=4, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+
+            torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, padding=1, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=32)
+
         )
 
-        self.encoder_mu = 0 #TODO
-        self.encoder_sigma = 0 #TODO
+        self.encoder_mu = torch.nn.Linear(
+            in_features=32,
+            out_features=32
+        )
+        self.encoder_sigma = torch.nn.Linear(
+            in_features=32,
+            out_features=32
+        )
 
-        self.decoder = torch.nn.Sequential( #TODO
+        self.decoder = torch.nn.Sequential(
+            torch.nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=4, padding=1, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+
+            torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=4, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=16),
+
+            torch.nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=4, padding=1, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+
+            torch.nn.ConvTranspose2d(in_channels=8, out_channels=8, kernel_size=7),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=8),
+
+            torch.nn.ConvTranspose2d(in_channels=8, out_channels=4, kernel_size=4, padding=1, stride=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(num_features=4),
+
+            torch.nn.ConvTranspose2d(in_channels=4, out_channels=1, kernel_size=5),
+            torch.nn.Sigmoid()
         )
 
 
@@ -110,7 +162,11 @@ class VAE(torch.nn.Module):
         out = self.encoder(x)
         out_flat = out.view(x.size(0), -1)
 
-        z = out_flat #TODO
+        z_sigma = torch.abs(self.encoder_sigma.forward(out_flat))
+        z_mu = self.encoder_mu.forward(out_flat)
+
+        eps = torch.normal(mean=0.0, std=1.0, size=z_mu.size()).to(DEVICE)
+        z = z_mu + z_sigma * eps  # reparameterization trick
 
         z_2d = z.view(x.size(0), -1, 1, 1)
         y_prim = self.decoder(z_2d)
@@ -152,10 +208,10 @@ for epoch in range(1, EPOCHS+1):
             model = model.train()
             y_prim, z, z_sigma, z_mu = model.forward(x)
 
-            #TODO
-            loss_rec = 0
-            loss_kl = 0
-            loss = 0
+            loss_rec = torch.mean((y_prim-y)**2)
+            loss_kl = torch.mean(VAE_BETA * torch.mean(-0.5 * (2 * torch.log(z_sigma + 1e-8) - z_sigma - z_mu**2 + 1), axis = 0))
+            loss = loss_kl + loss_rec
+            
 
             metrics_epoch[f'{stage}_loss_rec'].append(loss_rec.item())
             metrics_epoch[f'{stage}_loss_kl'].append(loss_kl.item())
