@@ -27,7 +27,7 @@ BATCH_SIZE = 36
 
 class DatasetBalls(torch.utils.data.Dataset):
     def __init__(self):
-        self.data = np.load('./balls_dataset.npy')
+        self.data = np.load('D:/project/balls_dataset.npy')
 
     def __len__(self):
         return len(self.data)
@@ -61,11 +61,10 @@ for x in data_loader:
         plt.tight_layout(pad=0.5)
     plt.show()
 
-    break
+    # break
     time.sleep(1)
-    #if input('inspect more samples? (y/n)') == 'n':
-    #    break
-
+    if input('inspect more samples? (y/n)') == 'n':
+       break
 
 class VAE2(torch.nn.Module):
     def __init__(self):
@@ -153,13 +152,13 @@ class VAE2(torch.nn.Module):
 
 
 model = VAE2()
-model.load_state_dict(torch.load('./pretrained_models/balls_mse_low-12-run.pt', map_location='cpu'))
+model.load_state_dict(torch.load('D:/project/balls_mse_low-12-run.pt'))
 model.eval()
 torch.set_grad_enabled(False)
 
 
 IDEXES_TO_ENCODE = [
-  42, 43, 44, 51, 52, 54, 10, 5, 25
+   10, 5, 25, 42, 51, 76, 81, 90, 121, 123, 130
 ]
 
 x_to_encode = []

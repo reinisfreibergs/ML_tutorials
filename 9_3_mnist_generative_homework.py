@@ -25,7 +25,7 @@ from torchvision import transforms
 BATCH_SIZE = 36
 
 dataset = torchvision.datasets.EMNIST(
-    root='../data',
+    root='D:/pythonProject/data',
     split='bymerge',
     train=True,
     download=True,
@@ -146,18 +146,36 @@ class VAE2(torch.nn.Module):
 
 
 model = VAE2()
-model.load_state_dict(torch.load('./pretrained_models/mnist_mnist_bce_low_beta_fixed_log_epsilon-17-run-25.pt', map_location='cpu'))
+model.load_state_dict(torch.load('D:/project/mnist_mnist_bce_low_beta_fixed_log_epsilon-17-run-25.pt', map_location='cpu'))
 model.eval()
 torch.set_grad_enabled(False)
 
+#  7 - 13, 58 , 61, 90, 109, 113,
+# 1_left - 25, 7, 64, 74, 81, 83, 97, 134, 125, 122
 
 IDEXES_TO_ENCODE = [
-   24, 25, 7, 136, 221 # all these are same type of letter
+   25, 7, 64, 74, 81, 83, 97, 134, 125, 122, 13, 58 , 61, 90, 109, 113   # all these are same type of letter # 13(7) 24(1 left) 25 (one_right)
 ]
 
 x_to_encode = []
 for idx in IDEXES_TO_ENCODE:
     x_to_encode.append(dataset[idx][0])
+
+x_tensor = torch.stack(x_to_encode)
+zs = model.encode_z(x_tensor)
+
+digit_one = torch.mean(zs[:10], axis=0)
+digit_seven = torch.mean(zs[11:], axis=0)
+
+zs_1 = digit_seven - digit_one
+# zs_1 = torch.mean(zs, axis=0)
+zs_1 = torch.reshape(zs_1, (1,32))
+
+x_generated = model.decode_z(zs_1)
+plt.imshow(x_generated.squeeze().T, cmap=plt.get_cmap('Greys'))
+plt.show()
+exit()
+
 
 plt_rows = int(np.ceil(np.sqrt(len(x_to_encode))))
 for i in range(len(x_to_encode)):
