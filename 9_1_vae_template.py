@@ -7,11 +7,13 @@ import torchvision
 import matplotlib.pyplot as plt
 plt.rcParams["figure.figsize"] = (12,5)
 import torch.utils.data
-
+import csv_result_parser as result_parser
+from file_utils import FileUtils
+FileUtils.createDir('9_results')
 
 VAE_BETA = 0.01
 BATCH_SIZE = 64
-EPOCHS = 100
+EPOCHS = 20
 LEARNING_RATE = 1e-3
 NOISINESS = 0.0
 
@@ -186,8 +188,11 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
-for epoch in range(1, EPOCHS+1):
+filename = result_parser.run_file_name()
 
+for epoch in range(1, EPOCHS+1):
+    metrics_csv = []
+    metrics_csv.append(epoch)
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -245,7 +250,7 @@ for epoch in range(1, EPOCHS+1):
     c = 0
     decor = '-'
     for key, value in metrics.items():
-
+        metrics_csv.append(value[-1])
         ax = plt.twinx()
         plts += ax.plot(value, f'C{c}{decor}', label=key)
 
@@ -265,7 +270,9 @@ for epoch in range(1, EPOCHS+1):
     plt.tight_layout(pad=0.5)
 
     if len(run_path) == 0:
-        plt.show()
+        # plt.show()
+        plt.draw()
+        plt.pause(1)
     else:
         if np.isnan(metrics[f'train_loss'][-1]) or np.isinf(metrics[f'test_loss'][-1]):
             exit()
@@ -274,3 +281,11 @@ for epoch in range(1, EPOCHS+1):
         plt.savefig(f'{run_path}/plt-{epoch}.png')
         torch.save(model.state_dict(), f'{run_path}/model-{epoch}.pt')
 
+    result_parser.run_csv(file_name='9_results/' + filename,
+                          metrics=metrics_csv)
+
+result_parser.best_result_csv(result_file='9.1_comparison_results.csv',
+                            run_file='9_results/' + filename,
+                            run_name=filename,
+                            batch_size= BATCH_SIZE,
+                            learning_rate= LEARNING_RATE)

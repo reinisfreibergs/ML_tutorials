@@ -17,10 +17,14 @@ import torch.utils.data
 import scipy.misc
 import scipy.ndimage
 
+import csv_result_parser as result_parser
+from file_utils import FileUtils
+FileUtils.createDir('8_results')
+
 model_path = 'D:\\project\\Autoencoder_weights.pt'
-USE_PRETRAINED = True
+USE_PRETRAINED = False
 USE_CUDA = torch.cuda.is_available()
-MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
+MAX_LEN =  10000 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
 # if USE_CUDA:
 #     MAX_LEN = None
 
@@ -140,7 +144,7 @@ class Autoencoder(torch.nn.Module):
 
 
 model = Autoencoder()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 if USE_PRETRAINED:
     model.load_state_dict(torch.load(model_path))
@@ -162,8 +166,10 @@ if not USE_PRETRAINED:
         ]:
             metrics[f'{stage}_{metric}'] = []
 
-    for epoch in range(1, 100):
-
+    filename = result_parser.run_file_name()
+    for epoch in range(1, 50):
+        metrics_csv = []
+        metrics_csv.append(epoch)
         for data_loader in [data_loader_train, data_loader_test]:
             metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -209,6 +215,7 @@ if not USE_PRETRAINED:
         plts = []
         c = 0
         for key, value in metrics.items():
+            metrics_csv.append(value[-1])
             value = scipy.ndimage.gaussian_filter1d(value, sigma=2)
             plts += plt.plot(value, f'C{c}', label=key)
             c += 1
@@ -223,11 +230,12 @@ if not USE_PRETRAINED:
             plt.imshow(np_y_prim[i][0].T, cmap=plt.get_cmap('Greys'))
 
         plt.tight_layout(pad=0.5)
+        # plt.show()
         plt.draw()
         plt.pause(0.1)
 
         # save model weights
-        torch.save(model.state_dict(), model_path)
+        # torch.save(model.state_dict(), model_path)
 
         # # save chepoint
         # torch.save({
@@ -236,6 +244,16 @@ if not USE_PRETRAINED:
         #     'optimizer_state_dict': optimizer.state_dict(),
         #     'loss': loss
         # }, model_path)
+
+
+        result_parser.run_csv(file_name='8_results/' + filename,
+                          metrics=metrics_csv)
+
+    result_parser.best_result_csv(result_file='8.1_comparison_results.csv',
+                                run_file='8_results/' + filename,
+                                run_name=filename,
+                                batch_size= 16,
+                                learning_rate= 1e-3)
 else:
 
     def normalize(data):
@@ -267,4 +285,3 @@ else:
             plt.pause(1)
 
 
-input('quit?')
