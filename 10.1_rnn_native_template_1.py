@@ -12,10 +12,14 @@ import string
 from nltk.tokenize import sent_tokenize, word_tokenize
 import nltk
 
+import csv_result_parser as result_parser
+from file_utils import FileUtils
+FileUtils.createDir('10_results')
+
 # nltk.download('punkt')
 
 BATCH_SIZE = 128
-EPOCHS = 100
+EPOCHS = 300
 LEARNING_RATE = 1e-3
 
 RNN_HIDDEN_SIZE = 256
@@ -32,7 +36,7 @@ MIN_SENTENCE_LEN = 3
 MAX_SENTENCE_LEN = 20
 MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
 if DEVICE == 'cuda':
-    MAX_LEN = 10000
+    MAX_LEN = 1000
 
 PATH_DATA = 'D:/project/data'
 os.makedirs('./results', exist_ok=True)
@@ -238,9 +242,11 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
+filename = result_parser.run_file_name()
 for epoch in range(1, EPOCHS+1):
 
-
+    metrics_csv = []
+    metrics_csv.append(epoch)
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -291,7 +297,7 @@ for epoch in range(1, EPOCHS+1):
                 metrics_strs.append(f'{key}: {round(value, 2)}')
         print(f'epoch: {epoch} {" ".join(metrics_strs)}')
 
-    if best_test_loss > loss.item():
+    if best_test_loss > loss.item() and epoch%49 ==0:
         best_test_loss = loss.item()
         torch.save(model.cpu().state_dict(), f'./results/model-{epoch}.pt')
         model = model.to(DEVICE)
@@ -313,10 +319,24 @@ for epoch in range(1, EPOCHS+1):
     plts = []
     c = 0
     for key, value in metrics.items():
+        metrics_csv.append(value[-1])
         plts += plt.plot(value, f'C{c}', label=key)
         ax = plt.twinx()
         c += 1
 
     plt.legend(plts, [it.get_label() for it in plts])
-    plt.savefig(f'./results/epoch-{epoch}.png')
     plt.show()
+    if epoch%20==0:
+        plt.savefig(f'./results/epoch-{epoch}.png')
+    if epoch%299 == 0:
+        plt.show()
+        plt.savefig(f'./results/epoch-{epoch}.png')
+
+    result_parser.run_csv(file_name='10_results/' + filename,
+                      metrics=metrics_csv)
+
+result_parser.best_result_csv(result_file='10.1_comparison_results.csv',
+                            run_file='10_results/' + filename,
+                            run_name=filename,
+                            batch_size= BATCH_SIZE,
+                            learning_rate= LEARNING_RATE)
