@@ -12,7 +12,7 @@ import torch.utils.data
 from nltk.tokenize import sent_tokenize, word_tokenize
 import nltk
 
-nltk.download('punkt')
+# nltk.download('punkt')
 
 BATCH_SIZE = 128
 EPOCHS = 100
@@ -34,20 +34,20 @@ MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU 
 if DEVICE == 'cuda':
     MAX_LEN = 10000
 
-PATH_DATA = '../data'
+PATH_DATA = 'D:/project/data'
 os.makedirs('./results', exist_ok=True)
 os.makedirs(PATH_DATA, exist_ok=True)
 
 
 class DatasetCustom(torch.utils.data.Dataset):
     def __init__(self):
-        if not os.path.exists(f'{PATH_DATA}/recipes_raw_nosource_epi.json'):
+        if not os.path.exists(f'{PATH_DATA}/quotes.json'):
             download_url_to_file(
-                'https://www.yellowrobot.xyz/share/recipes_raw_nosource_epi.json',
-                f'{PATH_DATA}/recipes_raw_nosource_epi.json',
+                'https://www.kaggle.com/akmittal/quotes-dataset/version/1?select=quotes.json',
+                f'{PATH_DATA}/quotes.json',
                 progress=True
             )
-        with open(f'{PATH_DATA}/recipes_raw_nosource_epi.json') as fp:
+        with open(f'{PATH_DATA}/quotes.json', encoding='utf8') as fp:
             data_json = json.load(fp)
 
         self.sentences = []
@@ -57,7 +57,7 @@ class DatasetCustom(torch.utils.data.Dataset):
         self.idxes_to_words = {}
 
         for each_instruction in data_json.values():
-            str_instructions = each_instruction['instructions']
+            str_instructions = each_instruction['Quote']
             sentences = sent_tokenize(str_instructions)
             for sentence in sentences:
                 words = word_tokenize(sentence.lower())
