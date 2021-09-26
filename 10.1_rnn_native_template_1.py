@@ -1,4 +1,4 @@
-
+import math
 import json
 import os
 import torch
@@ -112,8 +112,8 @@ class DatasetCustom(torch.utils.data.Dataset):
             print(k)
             rare_word_count+=1
         print(rare_word_count)
-        plt.bar(self.histogram_dict.keys() , self.histogram_dict.values(), width=3, color = 'g')
-        plt.show()
+        # plt.bar(self.histogram_dict.keys() , self.histogram_dict.values(), width=3, color = 'g')
+        # plt.show()
 
     def __len__(self):
         return len(self.sentences)
@@ -147,23 +147,82 @@ data_loader_test = torch.utils.data.DataLoader(
 )
 
 class RNNCell(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, input_size, hidden_size):
         super().__init__()
-        #TODO
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        stdv = 1 / math.sqrt(hidden_size)
+
+        self.W_x = torch.nn.Parameter(
+            torch.FloatTensor(input_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.W_h = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.b = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size).zero_()
+        )
 
     def forward(self, x: PackedSequence, hidden=None):
-        #TODO
-        return hidden
+        h_out = []
+
+        x_unpacked, lengths = pad_packed_sequence(x, batch_first=True)
+        batch_size = x_unpacked.size(0)
+        if hidden is None:
+            hidden = torch.FloatTensor(batch_size, self.hidden_size).zero_().to(DEVICE)
+
+        x_seq = x_unpacked.permute(1, 0, 2)
+        for x_t in x_seq:
+            hidden = torch.tanh(
+                x_t @ self.W_x +
+                hidden @ self.W_h +
+                self.b
+            )
+            h_out.append(hidden)
+        t_h_out = torch.stack(h_out)
+        t_h_out = t_h_out.permute(1, 0, 2)
+
+        t_h_packed = pack_padded_sequence(t_h_out, lengths, batch_first=True)
+
+        return t_h_packed
 
 
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        #TODO
+
+        self.embeddings = torch.nn.Embedding(
+            num_embeddings=dataset_full.max_classes_tokens,
+            embedding_dim=RNN_HIDDEN_SIZE
+        )
+
+        layers = []
+        for _ in range(RNN_LAYERS):
+            layers.append(RNNCell(
+                input_size=RNN_HIDDEN_SIZE,
+                hidden_size=RNN_HIDDEN_SIZE
+            ))
+        self.rnn  =torch.nn.Sequential(*layers)
 
     def forward(self, x: PackedSequence, hidden=None):
+        x_idxes = x.data.argmax(dim=1)
+        embs = self.embeddings.forward(x_idxes)
+        embs_seq = PackedSequence(
+            data=embs,
+            batch_sizes=x.batch_sizes,
+            sorted_indices=x.sorted_indices
+        )
 
-        #TODO
+        hidden = self.rnn.forward(embs_seq)
+        y_prim_logits = hidden.data @ self.embeddings.weight.t()
+        y_prim = torch.softmax(y_prim_logits, dim=1)
+        y_prim_packed = PackedSequence(
+            data=y_prim,
+            batch_sizes=x.batch_sizes,
+            sorted_indices=x.sorted_indices
+        )
         return y_prim_packed, hidden
 
 model = Model()
