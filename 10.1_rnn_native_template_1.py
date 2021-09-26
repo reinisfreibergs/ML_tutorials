@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence, pack_padded_sequence
 from torch.hub import download_url_to_file
 import torch.utils.data
-
+import string
 # pip install nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 import nltk
@@ -56,9 +56,14 @@ class DatasetCustom(torch.utils.data.Dataset):
         self.words_counts = {}
         self.idxes_to_words = {}
 
-        for each_instruction in data_json.values():
+        for each_instruction in data_json:
             str_instructions = each_instruction['Quote']
-            sentences = sent_tokenize(str_instructions)
+
+            exclist = string.punctuation + string.digits
+            table = str.maketrans('', '', exclist)
+            str_instructions_punctuation = str_instructions.translate(table)
+
+            sentences = sent_tokenize(str_instructions_punctuation)
             for sentence in sentences:
                 words = word_tokenize(sentence.lower())
                 if len(words) > MAX_SENTENCE_LEN:
@@ -101,6 +106,14 @@ class DatasetCustom(torch.utils.data.Dataset):
         # TODO placeholder to replace rare words
         # TODO remove punctuation
         # TODO histogtam of words_counts
+        self.histogram_dict = dict( (k, v) for k, v in self.words_counts.items() if v <= 2  )
+        rare_word_count = 0
+        for k in self.histogram_dict.keys():
+            print(k)
+            rare_word_count+=1
+        print(rare_word_count)
+        plt.bar(self.histogram_dict.keys() , self.histogram_dict.values(), width=3, color = 'g')
+        plt.show()
 
     def __len__(self):
         return len(self.sentences)
