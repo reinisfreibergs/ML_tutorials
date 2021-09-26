@@ -192,6 +192,70 @@ class RNNCell(torch.nn.Module):
 
         return t_h_packed
 
+class GRUCell(torch.nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        stdv = 1 / math.sqrt(hidden_size)
+
+        self.W_z = torch.nn.Parameter(
+            torch.FloatTensor(input_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.U_z = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.b_z = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size).zero_()
+        )
+        self.W_r = torch.nn.Parameter(
+            torch.FloatTensor(input_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.U_r = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.b_r = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size).zero_()
+        )
+        self.W_h = torch.nn.Parameter(
+            torch.FloatTensor(input_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.U_h = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size, hidden_size).uniform_(-stdv, stdv)
+        )
+
+        self.b_h = torch.nn.Parameter(
+            torch.FloatTensor(hidden_size).zero_()
+        )
+
+    def forward(self, x: PackedSequence, hidden=None):
+        h_out = []
+
+        x_unpacked, lengths = pad_packed_sequence(x, batch_first=True)
+        batch_size = x_unpacked.size(0)
+        if hidden is None:
+            hidden = torch.FloatTensor(batch_size, self.hidden_size).zero_().to(DEVICE)
+
+        x_seq = x_unpacked.permute(1, 0, 2)
+        for x_t in x_seq:
+            z_t = torch.sigmoid(self.W_z @ x_t + self.U_z @ hidden + self.b_z)
+            r_t = torch.sigmoid(self.W_r @ x_t + self.U_r @ hidden + self.b_r)
+            h_t = torch.tanh(self.W_h @ x_t + self.U_h @ (r_t.T * hidden) + self.b_h)
+
+            hidden = (1 - z_t) * hidden + z_t * h_t
+
+            h_out.append(hidden)
+        t_h_out = torch.stack(h_out)
+        t_h_out = t_h_out.permute(1, 0, 2)
+
+        t_h_packed = pack_padded_sequence(t_h_out, lengths, batch_first=True)
+
+        return t_h_packed
 
 class Model(torch.nn.Module):
     def __init__(self):
@@ -204,7 +268,7 @@ class Model(torch.nn.Module):
 
         layers = []
         for _ in range(RNN_LAYERS):
-            layers.append(RNNCell(
+            layers.append(GRUCell(
                 input_size=RNN_HIDDEN_SIZE,
                 hidden_size=RNN_HIDDEN_SIZE
             ))
