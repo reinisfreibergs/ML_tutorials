@@ -38,7 +38,7 @@ MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU 
 if DEVICE == 'cuda':
     MAX_LEN = 1000
 
-PATH_DATA = 'D:/project/data'
+PATH_DATA = './datasets'
 os.makedirs('./results', exist_ok=True)
 os.makedirs(PATH_DATA, exist_ok=True)
 
@@ -180,8 +180,10 @@ class RNNCell(torch.nn.Module):
         x_seq = x_unpacked.permute(1, 0, 2)
         for x_t in x_seq:
             hidden = torch.tanh(
-                x_t @ self.W_x +
-                hidden @ self.W_h +
+                (
+                        self.W_x @ x_t.unsqueeze(dim=-1) +
+                        self.W_h @ hidden.unsqueeze(dim=-1)
+                ).squeeze() +
                 self.b
             )
             h_out.append(hidden)
@@ -241,13 +243,16 @@ class GRUCell(torch.nn.Module):
         if hidden is None:
             hidden = torch.FloatTensor(batch_size, self.hidden_size).zero_().to(DEVICE)
 
+
         x_seq = x_unpacked.permute(1, 0, 2)
         for x_t in x_seq:
-            z_t = torch.sigmoid(self.W_z @ x_t + self.U_z @ hidden + self.b_z)
-            r_t = torch.sigmoid(self.W_r @ x_t + self.U_r @ hidden + self.b_r)
-            h_t = torch.tanh(self.W_h @ x_t + self.U_h @ (r_t.T * hidden) + self.b_h)
+            hidden = hidden.unsqueeze(dim=-1)
+            x_t = x_t.unsqueeze(dim=-1)
+            z_t = torch.sigmoid((self.W_z @ x_t).squeeze() + (self.U_z @ hidden).squeeze() + self.b_z)
+            r_t = torch.sigmoid((self.W_r @ x_t).squeeze() + (self.U_r @ hidden).squeeze() + self.b_r)
+            h_t = torch.tanh((self.W_h @ x_t).squeeze() + (self.U_h @ (r_t.unsqueeze(dim=-1) * hidden)).squeeze() + self.b_h)
 
-            hidden = (1 - z_t) * hidden + z_t * h_t
+            hidden = (1 - z_t) * hidden.squeeze() + z_t * h_t
 
             h_out.append(hidden)
         t_h_out = torch.stack(h_out)
@@ -268,7 +273,7 @@ class Model(torch.nn.Module):
 
         layers = []
         for _ in range(RNN_LAYERS):
-            layers.append(GRUCell(
+            layers.append(RNNCell(
                 input_size=RNN_HIDDEN_SIZE,
                 hidden_size=RNN_HIDDEN_SIZE
             ))
