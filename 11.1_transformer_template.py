@@ -34,7 +34,7 @@ MIN_SENTENCE_LEN = 3
 MAX_SENTENCE_LEN = 20
 MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
 if DEVICE == 'cuda':
-    MAX_LEN = None
+    MAX_LEN = 200
 
 PATH_DATA = '../data'
 os.makedirs('./results', exist_ok=True)
@@ -108,31 +108,91 @@ class PositionalEncoding(torch.nn.Module):
 class TransformerLayer(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        #TODO
+
+        self.project_k = torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE)
+        self.project_q = torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE)
+        self.project_v = torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE)
+
+        self.ff = torch.nn.Sequential(
+            torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE),
+            torch.nn.GELU(),
+            torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE)
+        )
+
+        self.norm_1 = torch.nn.LayerNorm(normalized_shape=HIDDEN_SIZE)
+        self.norm_2 = torch.nn.LayerNorm(normalized_shape=HIDDEN_SIZE)
 
     def forward(self, x, lengths, atten):
+        batch_size = x.size(0)
+        seq_size = x.size(1)
 
-        #TODO
-        y_prim = x
+        k = self.project_k.forward(x)
+        q = self.project_k.forward(x)
+        v = self.project_k.forward(x)
+
+        atten_raw = q @ k.transpose(-1, -2) / np.sqrt(x.size(-1))
+
+        mask = torch.tril(torch.ones(seq_size,seq_size)).to(DEVICE)
+        atten_mask = atten_raw.masked_fill(mask==0, value = float('-inf'))
+        for idx, length in enumerate(lengths):
+            atten_mask[idx, :, length:] = float('-inf')
+            atten_mask[idx, length:, :] = float('-inf')
+
+        atten = torch.softmax(atten_mask, dim=-1)
+        atten = atten.masked_fill(((atten>0) == False), value=0.0)
+        out = atten @ v
+
+        out_1 = x + torch.dropout(out, p=DROPOUT, train=self.training)
+        out_1_norm = self.norm_1.forward(out_1)
+
+        out_2 = self.ff.forward(out_1_norm)
+        out_3 = out_1_norm + out_2
+        y_prim = self.norm_2.forward(out_3)
+
         return y_prim, lengths, atten
 
 
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        #TODO
+        self.project_w_e = torch.nn.Embedding(
+            num_embeddings=dataset_full.max_classes_tokens,
+            embedding_dim=HIDDEN_SIZE
+        )
+
+        self.project_p_e = torch.nn.Embedding(
+            num_embeddings=dataset_full.max_classes_tokens,
+            embedding_dim=HIDDEN_SIZE
+        )
+
+        self.transformer = torch.nn.ModuleList(
+            [TransformerLayer() for _ in range(TRANSFORMER_LAYERS)]
+        )
+
+        self.fc = torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE)
 
     def forward(self, x: PackedSequence):
 
         x_e = PackedSequence(
-            data=self.embeddings.forward(x.data.argmax(dim=1)),
+            data=self.project_w_e.forward(x.data.argmax(dim=1)),
             batch_sizes=x.batch_sizes,
             sorted_indices=x.sorted_indices
         )
         x_e_unpacked, lengths = pad_packed_sequence(x_e, batch_first=True)
 
-        #TODO
-        y_prim = 0
+        pos_idxes = torch.arange(0, torch.max(lengths)).to(DEVICE)
+        p_e = self.project_p_e.forward(pos_idxes)
+        p_e = p_e.unsqueeze(dim=0)
+        p_e = p_e.expand(x_e_unpacked.size())
+
+        z = x_e_unpacked + p_e
+        atten = None
+        for layer in self.transformer:
+            z, lengths, atten = layer.forward(z, lengths, atten)
+
+        z_packed = pack_padded_sequence(z, lengths, batch_first=True)
+        y_prim_logits = self.fc.forward(z_packed.data) @ self.project_w_e.weight.t()
+        y_prim = torch.softmax(y_prim_logits, dim=1)
 
         y_prim_packed = PackedSequence(
             data=y_prim,
