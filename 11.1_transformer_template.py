@@ -17,6 +17,10 @@ import torch.utils.data
 # pip install nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 import nltk
+import csv_result_parser as result_parser
+from file_utils import FileUtils
+FileUtils.createDir('11_results')
+
 BATCH_SIZE = 32
 EPOCHS = 1000
 LEARNING_RATE = 1e-3
@@ -175,6 +179,10 @@ class TransformerLayer(torch.nn.Module):
         q = self.project_k.forward(x)
         v = self.project_k.forward(x)
 
+        k = k.view(batch_size, seq_size, TRANSFORMER_HEADS, int(HIDDEN_SIZE/TRANSFORMER_HEADS)).transpose(1, 2)
+        q = q.view(batch_size, seq_size, TRANSFORMER_HEADS, int(HIDDEN_SIZE/TRANSFORMER_HEADS)).transpose(1, 2)
+        v = v.view(batch_size, seq_size, TRANSFORMER_HEADS, int(HIDDEN_SIZE/TRANSFORMER_HEADS)).transpose(1, 2)
+
         atten_raw = q @ k.transpose(-1, -2) / np.sqrt(x.size(-1))
 
         mask = torch.tril(torch.ones(seq_size,seq_size)).to(DEVICE)
@@ -186,6 +194,10 @@ class TransformerLayer(torch.nn.Module):
         atten = torch.softmax(atten_mask, dim=-1)
         atten = atten.masked_fill(((atten>0) == False), value=0.0)
         out = atten @ v
+
+        out = out.transpose(1, 2)
+        out = out.contiguous().view(batch_size, seq_size, HIDDEN_SIZE)
+        atten = atten.detach().mean(dim=1)
 
         out_1 = x + torch.dropout(out, p=DROPOUT, train=self.training)
         out_1_norm = self.norm_1.forward(out_1)
@@ -260,9 +272,10 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
+filename = result_parser.run_file_name()
 for epoch in range(1, EPOCHS+1):
-
-
+    metrics_csv = []
+    metrics_csv.append(epoch)
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
 
@@ -315,13 +328,13 @@ for epoch in range(1, EPOCHS+1):
                 metrics_strs.append(f'{key}: {round(value, 4)}')
         print(f'epoch: {epoch} {" ".join(metrics_strs)}')
 
-    if best_test_loss > loss.item():
-        best_test_loss = loss.item()
-        torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
-        model = model.to(DEVICE)
+    # if best_test_loss > loss.item():
+    #     best_test_loss = loss.item()
+    #     torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
+    #     model = model.to(DEVICE)
 
-        imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-0.png', atten[0].cpu().data.numpy())
-        imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-l.png', atten[-1].cpu().data.numpy())
+        # imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-0.png', atten[0].cpu().data.numpy())
+        # imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-l.png', atten[-1].cpu().data.numpy())
 
 
     print('Examples:')
@@ -341,13 +354,14 @@ for epoch in range(1, EPOCHS+1):
     plts = []
     c = 0
     for key, value in metrics.items():
+        metrics_csv.append(value[-1])
         plts += plt.plot(value, f'C{c}', label=key)
         ax = plt.twinx()
         c += 1
 
     plt.legend(plts, [it.get_label() for it in plts])
     plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
-    if epoch%10==0:
+    if epoch%999==0:
         plt.show()
 
         attention_data = atten.cpu().detach().numpy()
@@ -356,3 +370,14 @@ for epoch in range(1, EPOCHS+1):
         plt.figure(figsize = (10,7))
         sn.heatmap(frame, annot=True)
         plt.show()
+    else:
+        plt.close()
+
+    result_parser.run_csv(file_name='11_results/' + filename,
+                      metrics=metrics_csv)
+
+result_parser.best_result_csv(result_file='11.1_comparison_results.csv',
+                            run_file='11_results/' + filename,
+                            run_name=filename,
+                            batch_size= BATCH_SIZE,
+                            learning_rate= LEARNING_RATE)
