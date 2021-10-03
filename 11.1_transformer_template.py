@@ -1,4 +1,4 @@
-
+import string
 import json
 import os
 import pdb
@@ -42,19 +42,65 @@ os.makedirs(PATH_DATA, exist_ok=True)
 
 class DatasetCustom(torch.utils.data.Dataset):
     def __init__(self):
+
+        with open(f'{PATH_DATA}/quotes.json', encoding='utf8') as fp:
+            data_json = json.load(fp)
+
         self.sentences = []
         self.lengths = []
         self.words_to_idxes = {}
         self.words_counts = {}
         self.idxes_to_words = {}
-        self.max_length = 0
+
+        for each_instruction in data_json:
+            str_instructions = each_instruction['Quote']
+
+            exclist = string.punctuation + string.digits
+            table_ = str.maketrans('', '', exclist)
+            str_instructions_punctuation = str_instructions.translate(table_)
+
+            sentences = sent_tokenize(str_instructions_punctuation)
+            for sentence in sentences:
+                words = word_tokenize(sentence.lower())
+                if len(words) > MAX_SENTENCE_LEN:
+                    words = words[:MAX_SENTENCE_LEN]
+                if len(words) < MIN_SENTENCE_LEN:
+                    continue
+                sentence_tokens = []
+                for word in words:
+                    if word not in self.words_to_idxes:
+                        self.words_to_idxes[word] = len(self.words_to_idxes)
+                        self.idxes_to_words[self.words_to_idxes[word]] = word
+                        self.words_counts[word] = 0
+                    self.words_counts[word] += 1
+                    sentence_tokens.append(self.words_to_idxes[word])
+                self.sentences.append(sentence_tokens)
+                self.lengths.append(len(sentence_tokens))
+            if MAX_LEN is not None and len(self.sentences) > MAX_LEN:
+                break
+
+        self.max_length = np.max(self.lengths) + 1
+
         self.end_token = '[END]'
+        self.words_to_idxes[self.end_token] = len(self.words_to_idxes)
+        self.idxes_to_words[self.words_to_idxes[self.end_token]] = self.end_token
+        self.words_counts[self.end_token] = len(self.sentences)
+
         self.max_classes_tokens = len(self.words_to_idxes)
-        self.weights = 0
+
+        word_counts = np.array(list(self.words_counts.values()))
+        self.weights = (1.0 / word_counts) * np.sum(word_counts) * 0.5
+
+        print(f'self.sentences: {len(self.sentences)}')
+        print(f'self.max_length: {self.max_length}')
+        print(f'self.max_classes_tokens: {self.max_classes_tokens}')
+
+        print('Example sentences:')
+        samples = np.random.choice(self.sentences, 5)
+        for each in samples:
+            print(' '.join([self.idxes_to_words[it] for it in each]))
 
     def __len__(self):
-        if MAX_LEN:
-            return MAX_LEN
         return len(self.sentences)
 
     def __getitem__(self, idx):
@@ -67,11 +113,8 @@ class DatasetCustom(torch.utils.data.Dataset):
 
         return np_x_padded, np_y_padded, np_length
 
-if not os.path.exists(f'{PATH_DATA}/dataset_full.pt'):
-    download_url_to_file('http://www.yellowrobot.xyz/share/dataset_full.pt', f'{PATH_DATA}/dataset_full.pt', progress=True)
 
-with open(f'{PATH_DATA}/dataset_full.pt', 'rb') as fp:
-    dataset_full = pickle.load(fp)
+dataset_full = DatasetCustom()
 
 torch.manual_seed(0)
 dataset_train, dataset_test = torch.utils.data.random_split(
