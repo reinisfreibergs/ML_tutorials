@@ -3,6 +3,8 @@ import json
 import os
 import pdb
 import pickle
+import pandas as pd
+import seaborn as sn
 
 import imageio
 import torch
@@ -345,4 +347,12 @@ for epoch in range(1, EPOCHS+1):
 
     plt.legend(plts, [it.get_label() for it in plts])
     plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
-    plt.show()
+    if epoch%10==0:
+        plt.show()
+
+        attention_data = atten.cpu().detach().numpy()
+        attention_matrix = attention_data[-1]
+        frame = pd.DataFrame(attention_matrix).round(decimals=2)
+        plt.figure(figsize = (10,7))
+        sn.heatmap(frame, annot=True)
+        plt.show()
