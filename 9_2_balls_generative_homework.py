@@ -28,15 +28,14 @@ BATCH_SIZE = 36
 class DatasetBalls(torch.utils.data.Dataset):
     def __init__(self):
         self.data = np.load('D:/project/balls_dataset.npy')
-
+        self.transform = torchvision.transforms.ToTensor()
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         pil_y = self.data[idx]
-        
-        transform = torchvision.transforms.ToTensor()
-        pil_y = transform(pil_y)
+
+        pil_y = self.transform(pil_y)
         pil_y = pil_y.permute(1,2,0)
         np_y = np.array(pil_y)
         return torch.FloatTensor(np_y)
