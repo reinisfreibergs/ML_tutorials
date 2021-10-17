@@ -87,10 +87,10 @@ class DatasetCustom(torch.utils.data.Dataset):
 
         self.max_length = np.max(self.lengths) + 1
 
-        self.end_token = '[END]'
-        self.words_to_idxes[self.end_token] = len(self.words_to_idxes)
-        self.idxes_to_words[self.words_to_idxes[self.end_token]] = self.end_token
-        self.words_counts[self.end_token] = len(self.sentences)
+        # self.end_token = '[END]'
+        # self.words_to_idxes[self.end_token] = len(self.words_to_idxes)
+        # self.idxes_to_words[self.words_to_idxes[self.end_token]] = self.end_token
+        # self.words_counts[self.end_token] = len(self.sentences)
 
         self.max_classes_tokens = len(self.words_to_idxes)
 
@@ -110,7 +110,8 @@ class DatasetCustom(torch.utils.data.Dataset):
         return len(self.sentences)
 
     def __getitem__(self, idx):
-        np_x_idxes = np.array(self.sentences[idx] + [self.words_to_idxes[self.end_token]])
+        # np_x_idxes = np.array(self.sentences[idx] + [self.words_to_idxes[self.end_token]])
+        np_x_idxes = np.array(self.sentences[idx])
         np_x_padded = np.zeros((self.max_length, self.max_classes_tokens))
         np_x_padded[np.arange(len(np_x_idxes)), np_x_idxes] = 1.0
 
