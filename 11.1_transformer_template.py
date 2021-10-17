@@ -177,8 +177,8 @@ class TransformerLayer(torch.nn.Module):
         seq_size = x.size(1)
 
         k = self.project_k.forward(x)
-        q = self.project_k.forward(x)
-        v = self.project_k.forward(x)
+        q = self.project_q.forward(x)
+        v = self.project_v.forward(x)
 
         k = k.view(batch_size, seq_size, TRANSFORMER_HEADS, int(HIDDEN_SIZE/TRANSFORMER_HEADS)).transpose(1, 2)
         q = q.view(batch_size, seq_size, TRANSFORMER_HEADS, int(HIDDEN_SIZE/TRANSFORMER_HEADS)).transpose(1, 2)
