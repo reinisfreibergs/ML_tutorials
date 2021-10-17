@@ -5,6 +5,7 @@ import pdb
 import pickle
 import pandas as pd
 import seaborn as sn
+import argparse
 
 import imageio
 import torch
@@ -21,9 +22,15 @@ import csv_result_parser as result_parser
 from file_utils import FileUtils
 FileUtils.createDir('11_results')
 
-BATCH_SIZE = 32
-EPOCHS = 1000
-LEARNING_RATE = 1e-3
+parser = argparse.ArgumentParser(description='Model trainer')
+parser.add_argument('-learning_rate', default=3e-3, type=float)
+parser.add_argument('-batch_size', default=32, type=int)
+parser.add_argument('-epochs', default=10, type=int)
+args = parser.parse_args()
+
+BATCH_SIZE = args.batch_size
+EPOCHS = args.epochs
+LEARNING_RATE = args.learning_rate
 
 HIDDEN_SIZE = 64
 TRANSFORMER_LAYERS = 8
@@ -349,7 +356,7 @@ for epoch in range(1, EPOCHS+1):
             if epoch % (EPOCHS-EPOCHS%interval) ==0:
                 attention_data = atten.cpu().detach().numpy()
                 attention_matrix = attention_data[idx]
-                
+
                 frame = pd.DataFrame(attention_matrix).round(decimals=2)
                 plt.figure(figsize = (13,10))
                 words = [dataset_full.idxes_to_words[it] for it in x_idxes]
