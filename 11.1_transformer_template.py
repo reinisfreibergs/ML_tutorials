@@ -329,27 +329,37 @@ for epoch in range(1, EPOCHS+1):
                 metrics_strs.append(f'{key}: {round(value, 4)}')
         print(f'epoch: {epoch} {" ".join(metrics_strs)}')
 
-    # if best_test_loss > loss.item():
-    #     best_test_loss = loss.item()
-    #     torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
-    #     model = model.to(DEVICE)
 
         # imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-0.png', atten[0].cpu().data.numpy())
         # imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-l.png', atten[-1].cpu().data.numpy())
+    interval = 10
+    if epoch%interval==0:
+        print('Examples:')
+        y_prim_unpacked, lengths_unpacked = pad_packed_sequence(y_prim_packed.cpu(), batch_first=True)
+        y_prim_unpacked = y_prim_unpacked[:5]
+        for idx, each in enumerate(y_prim_unpacked):
+            length = lengths_unpacked[idx]
+
+            y_prim_idxes = np.argmax(each[:length].data.numpy(), axis=1).tolist()
+            x_idxes = np.argmax(x[idx, :length].cpu().data.numpy(), axis=1).tolist()
+            y_prim_idxes = [x_idxes[0]] + y_prim_idxes
+            print('x     : ' +' '.join([dataset_full.idxes_to_words[it] for it in x_idxes]))
+            print('y_prim: ' +' '.join([dataset_full.idxes_to_words[it] for it in y_prim_idxes]))
+
+            if epoch % (EPOCHS-EPOCHS%interval) ==0:
+                attention_data = atten.cpu().detach().numpy()
+                attention_matrix = attention_data[idx]
+                
+                frame = pd.DataFrame(attention_matrix).round(decimals=2)
+                plt.figure(figsize = (13,10))
+                words = [dataset_full.idxes_to_words[it] for it in x_idxes]
+                heatmap = sn.heatmap(frame, annot=True, xticklabels = words, yticklabels = words)
+                heatmap.set_xticklabels(heatmap.get_xticklabels(), rotation=90)
+                heatmap.xaxis.tick_top() # x axis on top
+                heatmap.xaxis.set_label_position('top')
+                plt.savefig(f'./results/attention_matrix-epoch-{epoch}-idx {idx}.png')
 
 
-    print('Examples:')
-    y_prim_unpacked, lengths_unpacked = pad_packed_sequence(y_prim_packed.cpu(), batch_first=True)
-    y_prim_unpacked = y_prim_unpacked[:5] # 5 examples
-    for idx, each in enumerate(y_prim_unpacked):
-        length = lengths_unpacked[idx]
-
-        y_prim_idxes = np.argmax(each[:length].data.numpy(), axis=1).tolist()
-        x_idxes = np.argmax(x[idx, :length].cpu().data.numpy(), axis=1).tolist()
-        y_prim_idxes = [x_idxes[0]] + y_prim_idxes
-        print('x     : ' +' '.join([dataset_full.idxes_to_words[it] for it in x_idxes]))
-        print('y_prim: ' +' '.join([dataset_full.idxes_to_words[it] for it in y_prim_idxes]))
-        print('')
 
     plt.figure(figsize=(12,5))
     plts = []
@@ -360,25 +370,18 @@ for epoch in range(1, EPOCHS+1):
         ax = plt.twinx()
         c += 1
 
-    plt.legend(plts, [it.get_label() for it in plts])
-    plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
-    if epoch%999==0:
-        plt.show()
+        if epoch % (EPOCHS-1) ==0:
+            plt.legend(plts, [it.get_label() for it in plts])
+            plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
 
-        attention_data = atten.cpu().detach().numpy()
-        attention_matrix = attention_data[-1]
-        frame = pd.DataFrame(attention_matrix).round(decimals=2)
-        plt.figure(figsize = (10,7))
-        sn.heatmap(frame, annot=True)
-        plt.show()
-    else:
-        plt.close()
+            torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
+            model = model.to(DEVICE)
 
-    result_parser.run_csv(file_name='11_results/' + filename,
+    result_parser.run_csv(file_name='results/' + filename,
                       metrics=metrics_csv)
 
 result_parser.best_result_csv(result_file='11.1_comparison_results.csv',
-                            run_file='11_results/' + filename,
+                            run_file='results/' + filename,
                             run_name=filename,
                             batch_size= BATCH_SIZE,
                             learning_rate= LEARNING_RATE)
