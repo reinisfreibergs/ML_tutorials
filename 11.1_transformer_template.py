@@ -7,25 +7,25 @@ import pandas as pd
 import seaborn as sn
 import argparse
 
-import imageio
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence, pack_padded_sequence
-from torch.hub import download_url_to_file
 import torch.utils.data
 
 # pip install nltk
+# import nltk
+# nltk.download('punkt')
+
 from nltk.tokenize import sent_tokenize, word_tokenize
-import nltk
+
 import csv_result_parser as result_parser
-from file_utils import FileUtils
-FileUtils.createDir('11_results')
+
 
 parser = argparse.ArgumentParser(description='Model trainer')
-parser.add_argument('-learning_rate', default=3e-3, type=float)
+parser.add_argument('-learning_rate', default=1e-3, type=float)
 parser.add_argument('-batch_size', default=32, type=int)
-parser.add_argument('-epochs', default=10, type=int)
+parser.add_argument('-epochs', default=2000, type=int)
 args = parser.parse_args()
 
 BATCH_SIZE = args.batch_size
@@ -47,9 +47,9 @@ MIN_SENTENCE_LEN = 3
 MAX_SENTENCE_LEN = 20
 MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
 if DEVICE == 'cuda':
-    MAX_LEN = 200
+    MAX_LEN = None
 
-PATH_DATA = '../data'
+PATH_DATA = './data'
 os.makedirs('./results', exist_ok=True)
 os.makedirs(PATH_DATA, exist_ok=True)
 
