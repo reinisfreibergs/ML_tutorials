@@ -18,12 +18,14 @@ parser.add_argument('-is_render', default=True, type=lambda x: (str(x).lower() =
 
 parser.add_argument('-learning_rate', default=1e-3, type=float)
 parser.add_argument('-batch_size', default=128, type=int)
-parser.add_argument('-episodes', default=10000, type=int)
-parser.add_argument('-replay_buffer_size', default=500, type=int)
+parser.add_argument('-episodes', default=5000, type=int)
+parser.add_argument('-replay_buffer_size', default=5000, type=int)
+
+parser.add_argument('-target_update', default=3000, type=int)
 
 parser.add_argument('-hidden_size', default=128, type=int)
 
-parser.add_argument('-gamma', default=0.9, type=float)
+parser.add_argument('-gamma', default = 0.99, type=float)
 parser.add_argument('-epsilon', default=0.99, type=float)
 parser.add_argument('-epsilon_min', default=0.1, type=float)
 parser.add_argument('-epsilon_decay', default=0.999, type=float)
@@ -40,26 +42,52 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.layers = torch.nn.Sequential(
-            #TODO
+            torch.nn.Linear(in_features=state_size, out_features=hidden_size),
+            torch.nn.LayerNorm(normalized_shape=hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=hidden_size, out_features=action_size),
+
+
         )
 
     def forward(self, s_t0):
         return self.layers.forward(s_t0)
 
 
-class ReplayMemory:
-    def __init__(self, size, batch_size):
+class ReplayPriorityMemory:
+    def __init__(self, size, batch_size, prob_alpha=1):
         self.size = size
         self.batch_size = batch_size
+        self.prob_alpha = prob_alpha
         self.memory = []
+        self.priorities = np.zeros((size,), dtype=np.float32)
+        self.pos = 0
 
     def push(self, transition):
+        new_priority = np.median(self.priorities) if self.memory else 1.0
+
         self.memory.append(transition)
         if len(self.memory) > self.size:
             del self.memory[0]
+        pos = len(self.memory) - 1
+        self.priorities[pos] = new_priority
 
     def sample(self):
-        return random.sample(self.memory, self.batch_size)
+        probs = np.array(self.priorities)
+        if len(self.memory) < len(probs):
+            probs = probs[:len(self.memory)]
+
+        probs += 1e-8
+        probs = probs ** self.prob_alpha
+        probs /= probs.sum()
+
+        indices = np.random.choice(len(self.memory), self.batch_size, p=probs)
+        samples = [self.memory[idx] for idx in indices]
+        return samples, indices
+
+    def update_priorities(self, batch_indices, batch_priorities):
+        for idx, priority in zip(batch_indices, batch_priorities):
+            self.priorities[idx] = priority.item()
 
     def __len__(self):
         return len(self.memory)
@@ -79,12 +107,17 @@ class DQNAgent:
         self.learning_rate = args.learning_rate
         self.device = args.device
         self.q_model = Model(self.state_size, self.action_size, args.hidden_size).to(self.device)
+        self.q_t_model = Model(self.state_size, self.action_size, args.hidden_size).to(self.device)
+        self.update_q_t_model()
         self.optimizer = torch.optim.Adam(
             self.q_model.parameters(),
             lr=self.learning_rate,
         )
 
-        self.replay_memory = ReplayMemory(args.replay_buffer_size, args.batch_size)
+        self.replay_memory = ReplayPriorityMemory(args.replay_buffer_size, args.batch_size)
+
+    def update_q_t_model(self):
+        self.q_t_model.load_state_dict(self.q_model.state_dict())
 
     def act(self, s_t0):
         if np.random.rand() <= self.epsilon:
@@ -103,7 +136,7 @@ class DQNAgent:
             self.epsilon *= self.epsilon_decay
 
         self.optimizer.zero_grad()
-        batch = self.replay_memory.sample()
+        batch, replay_idxes = self.replay_memory.sample()
         s_t0, a_t0, r_t1, s_t1, is_end = zip(*batch)
 
         s_t0 = torch.FloatTensor(s_t0).to(args.device)
@@ -112,9 +145,21 @@ class DQNAgent:
         s_t1 = torch.FloatTensor(s_t1).to(args.device)
         is_not_end = torch.FloatTensor((np.array(is_end) == False) * 1.0).to(args.device)
 
-        #TODO
+        idxes = torch.arange(args.batch_size).to(args.device)
 
-        loss = 0
+        q_t0_all = self.q_model.forward(s_t0)
+        q_t0 = q_t0_all[idxes, a_t0]
+
+        q_t1_all = self.q_t_model.forward(s_t1).detach()
+        a_t1 = q_t1_all.argmax(dim=1)
+        q_t1 = q_t1_all[idxes, a_t1]
+
+        q_t1_final = r_t1 + is_not_end * (args.gamma * q_t1)
+
+        td_error = (q_t0-q_t1_final) ** 2
+        self.replay_memory.update_priorities(replay_idxes, td_error)
+        loss = torch.mean((q_t0-q_t1_final) ** 2)
+
         loss.backward()
         self.optimizer.step()
 
@@ -133,15 +178,19 @@ agent = DQNAgent(
     env.action_space.n
 )
 is_end = False
-batch_size = 32
+
+t_total = 0
 
 for e in range(args.episodes):
     s_t0 = env.reset()
     reward_total = 0
     episode_loss = []
     for t in range(args.max_steps):
-        if args.is_render and len(all_scores):
-            if e % 10 == 0 and all_scores[-1] > 0:
+        t_total+=1
+        if t_total % args.target_update == 0:
+            agent.update_q_t_model()
+        if args.is_render:
+            if len(all_scores)==0 or all([it > 0 for it in all_scores[-1:]]) > 0:
                 env.render()
         a_t0 = agent.act(s_t0)
         s_t1, r_t1, is_end, _ = env.step(a_t0)
