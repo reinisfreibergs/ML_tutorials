@@ -17,20 +17,20 @@ parser.add_argument('-device', default='cuda', type=str)
 parser.add_argument('-is_render', default=True, type=lambda x: (str(x).lower() == 'true'))
 
 parser.add_argument('-learning_rate', default=1e-3, type=float)
-parser.add_argument('-batch_size', default=128, type=int)
+parser.add_argument('-batch_size', default=64, type=int)
 parser.add_argument('-episodes', default=5000, type=int)
-parser.add_argument('-replay_buffer_size', default=5000, type=int)
+parser.add_argument('-replay_buffer_size', default=50000, type=int)
 
-parser.add_argument('-target_update', default=3000, type=int)
+parser.add_argument('-target_update', default=20, type=int)
 
 parser.add_argument('-hidden_size', default=128, type=int)
 
 parser.add_argument('-gamma', default = 0.99, type=float)
 parser.add_argument('-epsilon', default=0.99, type=float)
-parser.add_argument('-epsilon_min', default=0.1, type=float)
-parser.add_argument('-epsilon_decay', default=0.999, type=float)
+parser.add_argument('-epsilon_min', default=0.01, type=float)
+parser.add_argument('-epsilon_decay', default=0.996, type=float)
 
-parser.add_argument('-max_steps', default=500, type=int)
+parser.add_argument('-max_steps', default=1000, type=int)
 
 args, other_args = parser.parse_known_args()
 
@@ -45,7 +45,10 @@ class Model(nn.Module):
             torch.nn.Linear(in_features=state_size, out_features=hidden_size),
             torch.nn.LayerNorm(normalized_shape=hidden_size),
             torch.nn.ReLU(),
-            torch.nn.Linear(in_features=hidden_size, out_features=action_size),
+            torch.nn.Linear(in_features=hidden_size, out_features=10*action_size),
+            # torch.nn.LayerNorm(normalized_shape=10*action_size),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=10*action_size, out_features=action_size),
 
 
         )
@@ -156,9 +159,11 @@ class DQNAgent:
 
         q_t1_final = r_t1 + is_not_end * (args.gamma * q_t1)
 
-        td_error = (q_t0-q_t1_final) ** 2
+        # td_error = abs((q_t0-q_t1_final)) ** 2
+        td_error = abs((q_t0-q_t1_final))
         self.replay_memory.update_priorities(replay_idxes, td_error)
-        loss = torch.mean((q_t0-q_t1_final) ** 2)
+        # loss = torch.mean((q_t0-q_t1_final) ** 2)
+        loss = torch.mean(torch.abs(q_t0-q_t1_final))
 
         loss.backward()
         self.optimizer.step()
@@ -166,7 +171,8 @@ class DQNAgent:
         return loss.cpu().item()
 
 # environment name
-env = gym.make('LunarLander-v2')
+# env = gym.make('LunarLander-v2')
+env = gym.make('MountainCar-v0')
 plt.figure()
 
 all_scores = []
@@ -190,7 +196,7 @@ for e in range(args.episodes):
         if t_total % args.target_update == 0:
             agent.update_q_t_model()
         if args.is_render:
-            if len(all_scores)==0 or all([it > 0 for it in all_scores[-1:]]) > 0:
+            if len(all_scores)==0 or all([it > -200 for it in all_scores[-1:]]) > 0:
                 env.render()
         a_t0 = agent.act(s_t0)
         s_t1, r_t1, is_end, _ = env.step(a_t0)
