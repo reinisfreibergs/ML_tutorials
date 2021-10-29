@@ -56,8 +56,8 @@ os.makedirs(PATH_DATA, exist_ok=True)
 class DatasetCustom(torch.utils.data.Dataset):
     def __init__(self):
 
-        with open(f'{PATH_DATA}/quotes.json', encoding='utf8') as fp:
-            data_json = json.load(fp)
+        with open(f'{PATH_DATA}/quotes_unique_2.csv', encoding='utf8') as fp:
+            data_json = pd.read_csv(fp, engine='c')
 
         self.sentences = []
         self.lengths = []
@@ -65,13 +65,12 @@ class DatasetCustom(torch.utils.data.Dataset):
         self.words_counts = {}
         self.idxes_to_words = {}
 
-        for each_instruction in data_json:
-            str_instructions = each_instruction['Quote']
+        for each_instruction in data_json['Name']:
+            str_instructions = each_instruction
 
             exclist = string.punctuation + string.digits
             table_ = str.maketrans('', '', exclist)
-            str_instructions_punctuation = str_instructions.translate(table_)
-
+            str_instructions_punctuation = each_instruction.translate(table_)
             sentences = sent_tokenize(str_instructions_punctuation)
             for sentence in sentences:
                 words = word_tokenize(sentence.lower())
@@ -216,6 +215,29 @@ class TransformerLayer(torch.nn.Module):
 
         return y_prim, lengths, atten
 
+class TransformerLayer_2(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.layer = torch.nn.TransformerEncoderLayer(d_model=HIDDEN_SIZE,
+                                                  nhead=TRANSFORMER_HEADS,
+                                                  activation='relu',
+                                                  dropout=DROPOUT,
+                                                  batch_first=True)
+
+        self.attention = torch.nn.MultiheadAttention(embed_dim = HIDDEN_SIZE,
+                                                     num_heads= TRANSFORMER_HEADS,
+                                                     dropout=DROPOUT,
+                                                     batch_first=True)
+
+    def forward(self, x, lengths, atten):
+        seq_size = x.size(1)
+        mask = torch.tril(torch.ones(seq_size,seq_size)).to(DEVICE)
+
+        y_prim = self.layer.forward(x, mask)
+        atten, weights = self.attention(x, x, x, attn_mask=mask)
+
+        return y_prim, lengths, atten
 
 class Model(torch.nn.Module):
     def __init__(self):
@@ -231,7 +253,7 @@ class Model(torch.nn.Module):
         )
 
         self.transformer = torch.nn.ModuleList(
-            [TransformerLayer() for _ in range(TRANSFORMER_LAYERS)]
+            [TransformerLayer_2() for _ in range(TRANSFORMER_LAYERS)]
         )
 
         self.fc = torch.nn.Linear(in_features=HIDDEN_SIZE, out_features=HIDDEN_SIZE)
@@ -281,7 +303,10 @@ for stage in ['train', 'test']:
         metrics[f'{stage}_{metric}'] = []
 
 filename = result_parser.run_file_name()
+import time
+time_average = 0
 for epoch in range(1, EPOCHS+1):
+    start = time.time()
     metrics_csv = []
     metrics_csv.append(epoch)
     for data_loader in [data_loader_train, data_loader_test]:
@@ -367,28 +392,31 @@ for epoch in range(1, EPOCHS+1):
                 plt.savefig(f'./results/attention_matrix-epoch-{epoch}-idx {idx}.png')
 
 
+    if epoch%10==0:
+        plt.figure(figsize=(12,5))
+        plts = []
+        c = 0
+        for key, value in metrics.items():
+            metrics_csv.append(value[-1])
+            plts += plt.plot(value, f'C{c}', label=key)
+            ax = plt.twinx()
+            c += 1
 
-    plt.figure(figsize=(12,5))
-    plts = []
-    c = 0
-    for key, value in metrics.items():
-        metrics_csv.append(value[-1])
-        plts += plt.plot(value, f'C{c}', label=key)
-        ax = plt.twinx()
-        c += 1
+            if epoch % (10) ==0:
+                plt.legend(plts, [it.get_label() for it in plts])
+                plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
 
-        if epoch % (EPOCHS-1) ==0:
-            plt.legend(plts, [it.get_label() for it in plts])
-            plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
+                torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
+                model = model.to(DEVICE)
 
-            torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
-            model = model.to(DEVICE)
-
-    result_parser.run_csv(file_name='results/' + filename,
-                      metrics=metrics_csv)
-
-result_parser.best_result_csv(result_file='11.1_comparison_results.csv',
-                            run_file='results/' + filename,
-                            run_name=filename,
-                            batch_size= BATCH_SIZE,
-                            learning_rate= LEARNING_RATE)
+    # result_parser.run_csv(file_name='results/' + str(args.learning_rate) + filename,
+    #                   metrics=metrics_csv)
+    end = time.time() - start
+    time_average += end
+    print(end)
+    print(time_average/(epoch))
+# result_parser.best_result_csv(result_file='11.1_comparison_results.csv',
+#                             run_file='results/' + str(args.learning_rate) + filename,
+#                             run_name=filename,
+#                             batch_size= BATCH_SIZE,
+#                             learning_rate= LEARNING_RATE)
