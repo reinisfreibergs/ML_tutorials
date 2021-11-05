@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence, pack_padded_sequence
 import torch.utils.data
+from tqdm import tqdm
 
 # pip install nltk
 # import nltk
@@ -291,7 +292,8 @@ class Model(torch.nn.Module):
 
 model = Model()
 model = model.to(DEVICE)
-optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)
+loss_fn = torch.nn.CrossEntropyLoss(weight=None).to(DEVICE)
+optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
 
 metrics = {}
 best_test_loss = float('Inf')
@@ -316,7 +318,7 @@ for epoch in range(1, EPOCHS+1):
         if data_loader == data_loader_test:
             stage = 'test'
 
-        for x, y, lengths in data_loader:
+        for x, y, lengths in tqdm(data_loader):
 
             x = x.float().to(DEVICE)
             y = y.float().to(DEVICE)
