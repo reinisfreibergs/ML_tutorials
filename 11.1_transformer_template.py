@@ -1,8 +1,6 @@
 import string
-import json
 import os
 import pdb
-import pickle
 import pandas as pd
 import seaborn as sn
 import argparse
@@ -22,11 +20,13 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 
 import csv_result_parser as result_parser
 
-
 parser = argparse.ArgumentParser(description='Model trainer')
-parser.add_argument('-learning_rate', default=1e-3, type=float)
+parser.add_argument('-learning_rate', default=5e-3, type=float)
 parser.add_argument('-batch_size', default=32, type=int)
-parser.add_argument('-epochs', default=2000, type=int)
+parser.add_argument('-epochs', default=300, type=int)
+parser.add_argument('-transformer_heads', default=8, type=int) #4
+parser.add_argument('-transformer_layers', default=2, type=int) #8
+parser.add_argument('-interval', default=10, type=int)
 args = parser.parse_args()
 
 BATCH_SIZE = args.batch_size
@@ -34,11 +34,11 @@ EPOCHS = args.epochs
 LEARNING_RATE = args.learning_rate
 
 HIDDEN_SIZE = 64
-TRANSFORMER_LAYERS = 8
+TRANSFORMER_LAYERS = args.transformer_layers
 DROPOUT = 0.1
 run_name = 'add_full'
 
-TRANSFORMER_HEADS = 4
+TRANSFORMER_HEADS = args.transformer_heads
 
 DEVICE = 'cpu'
 if torch.cuda.is_available():
@@ -280,10 +280,10 @@ class Model(torch.nn.Module):
 
         z_packed = pack_padded_sequence(z, lengths, batch_first=True)
         y_prim_logits = self.fc.forward(z_packed.data) @ self.project_w_e.weight.t()
-        y_prim = torch.softmax(y_prim_logits, dim=1)
+        # y_prim = torch.softmax(y_prim_logits, dim=1)
 
         y_prim_packed = PackedSequence(
-            data=y_prim,
+            data=y_prim_logits,
             batch_sizes=x.batch_sizes,
             sorted_indices=x.sorted_indices
         )
@@ -335,9 +335,7 @@ for epoch in range(1, EPOCHS+1):
 
             y_prim_packed, atten = model.forward(x_packed)
 
-            weights = torch.from_numpy(dataset_full.weights[torch.argmax(y_packed.data, dim=1).cpu().numpy()])
-            weights = weights.unsqueeze(dim=1).to(DEVICE)
-            loss = -torch.mean(weights * y_packed.data * torch.log(y_prim_packed.data + 1e-8))
+            loss = loss_fn.forward(y_prim_packed.data, torch.argmax(y_packed.data, dim=1))
 
             metrics_epoch[f'{stage}_loss'].append(loss.item()) # Tensor(0.1) => 0.1f
 
@@ -366,8 +364,7 @@ for epoch in range(1, EPOCHS+1):
 
         # imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-0.png', atten[0].cpu().data.numpy())
         # imageio.imwrite(f'./results/{run_name}-epoch-{epoch}-atten-l.png', atten[-1].cpu().data.numpy())
-    interval = 10
-    if epoch%interval==0:
+    if epoch % args.interval==0:
         print('Examples:')
         y_prim_unpacked, lengths_unpacked = pad_packed_sequence(y_prim_packed.cpu(), batch_first=True)
         y_prim_unpacked = y_prim_unpacked[:5]
@@ -380,7 +377,7 @@ for epoch in range(1, EPOCHS+1):
             print('x     : ' +' '.join([dataset_full.idxes_to_words[it] for it in x_idxes]))
             print('y_prim: ' +' '.join([dataset_full.idxes_to_words[it] for it in y_prim_idxes]))
 
-            if epoch % (EPOCHS-EPOCHS%interval) ==0:
+            if epoch % (args.interval) ==0:
                 attention_data = atten.cpu().detach().numpy()
                 attention_matrix = attention_data[idx]
 
@@ -394,31 +391,31 @@ for epoch in range(1, EPOCHS+1):
                 plt.savefig(f'./results/attention_matrix-epoch-{epoch}-idx {idx}.png')
 
 
-    if epoch%10==0:
-        plt.figure(figsize=(12,5))
-        plts = []
-        c = 0
-        for key, value in metrics.items():
-            metrics_csv.append(value[-1])
-            plts += plt.plot(value, f'C{c}', label=key)
-            ax = plt.twinx()
-            c += 1
+    plt.figure(figsize=(12,5))
+    plts = []
+    c = 0
+    for key, value in metrics.items():
+        metrics_csv.append(value[-1])
+        plts += plt.plot(value, f'C{c}', label=key)
+        ax = plt.twinx()
+        c += 1
 
-            if epoch % (10) ==0:
-                plt.legend(plts, [it.get_label() for it in plts])
-                plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
+    if epoch % (args.interval) ==0:
+        plt.legend(plts, [it.get_label() for it in plts])
+        plt.savefig(f'./results/{run_name}-epoch-{epoch}.png')
 
-                torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
-                model = model.to(DEVICE)
+        torch.save(model.cpu().state_dict(), f'./results/{run_name}-model-{epoch}.pt')
+        model = model.to(DEVICE)
 
-    # result_parser.run_csv(file_name='results/' + str(args.learning_rate) + filename,
-    #                   metrics=metrics_csv)
+    result_parser.run_csv(file_name='results/' + str(args.transformer_layers) + str(args.learning_rate) + str(args.transformer_heads) + filename,
+                      metrics=metrics_csv)
     end = time.time() - start
     time_average += end
-    print(end)
     print(time_average/(epoch))
-# result_parser.best_result_csv(result_file='11.1_comparison_results.csv',
-#                             run_file='results/' + str(args.learning_rate) + filename,
-#                             run_name=filename,
-#                             batch_size= BATCH_SIZE,
-#                             learning_rate= LEARNING_RATE)
+result_parser.best_result_csv(result_file='11.1_comparison_results.csv',
+                            run_file='results/' + str(args.transformer_layers) + str(args.learning_rate) + str(args.transformer_heads) + filename,
+                            run_name=filename,
+                            batch_size= BATCH_SIZE,
+                            learning_rate= LEARNING_RATE,
+                            transformer_heads=TRANSFORMER_HEADS,
+                            transformer_layers=TRANSFORMER_LAYERS)
